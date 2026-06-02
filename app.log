@@ -1,0 +1,25 @@
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-05-28T15:35:17.760Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-05-28T15:35:44.336Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-05-28T18:33:18.544Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-05-28T18:35:00.335Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-05-28T18:35:41.641Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Error building image: Error: connect ENOENT //./pipe/docker_engine","timestamp":"2026-05-28T18:35:43.262Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-05-28T18:38:56.533Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-05-28T18:39:52.296Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Error building image: Error: (HTTP code 400) unexpected - the Dockerfile (Dockerfile) cannot be empty ","timestamp":"2026-05-28T18:39:54.163Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/build\",\"status\":\"500\",\"responseTime\":\"31.171\"}","timestamp":"2026-05-28T18:39:54.166Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-05-28T18:40:13.535Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Image built successfully","timestamp":"2026-05-28T18:40:15.234Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/build\",\"status\":\"200\",\"responseTime\":\"22.143\"}","timestamp":"2026-05-28T18:40:15.236Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-05-29T09:42:54.927Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T06:47:44.027Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T06:52:55.069Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T06:53:01.480Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T06:54:58.240Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T06:56:00.718Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T07:01:15.897Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T07:09:25.444Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Image built successfully","timestamp":"2026-06-02T07:09:42.520Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/build\",\"status\":\"200\",\"responseTime\":\"92.395\"}","timestamp":"2026-06-02T07:09:42.522Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T07:12:20.946Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T07:20:00.891Z"}

@@ -1,0 +1,30 @@
+{
+  "name": "backtobasics",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "tsc -b && node dist/index.js",
+    "dev": "nodemon --watch src --ext ts --exec node --loader ts-node/esm src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "@types/morgan": "^1.9.10",
+    "@types/winston": "^2.4.4",
+    "dockerode": "^5.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "morgan": "^1.10.1",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^4.0.1"
+  }
+}
