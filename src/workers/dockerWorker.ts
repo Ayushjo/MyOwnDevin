@@ -1,11 +1,20 @@
 import { SandboxManager } from "../sandbox/index.js";
 import logger from "../logger.js";
+import { GitManager } from "../GitManager/index.js";
 
 
 export const dockerWorker = new SandboxManager();
+const gitManager = new GitManager()
+const runTask = async (taskId: string, command: string,repoUrl:string) => {
 
-const runTask = async (taskId: string, command: string) => {
     try{
+        const cloneResult = await gitManager.clone(repoUrl,taskId);
+        if(!cloneResult){
+            throw new Error(`Error cloning repository`);
+        }
+        else{
+            logger.info(`Repository cloned successfully`);
+        }
         const container = await dockerWorker.createContainer("ayush")
         logger.info(`Container created with ID: ${container.id}`);
         
