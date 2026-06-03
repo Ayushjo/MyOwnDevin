@@ -5,6 +5,7 @@ import logger from '../logger.js';
 import {fileURLToPath} from 'url';
 import { PassThrough } from 'stream';
 import { stdout } from 'process';
+import { getTaskPath } from '../utils/taskPath.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export class SandboxManager {
@@ -14,6 +15,7 @@ export class SandboxManager {
   }
   
   async createContainer(taskId: string){
+    const taskPath = getTaskPath(taskId)
     const container = await docker.createContainer({
   Image: 'devin-sandbox:latest',
   Tty: false,          // false because you want separate stdout/stderr streams
@@ -21,12 +23,12 @@ export class SandboxManager {
   HostConfig: {
     Memory: 512 * 1024 * 1024,  // 512MB cap
     CpuShares: 512,              // half CPU weight
-    AutoRemove: false,           // you want to manually cleanup after checkpointing
+    AutoRemove: false, 
+    Binds:[`${taskPath}:/workspace`]          // you want to manually cleanup after checkpointing
   },
   Labels: {
     taskId: taskId  // so you can find orphaned containers on restart
-  }
-  
+  },
 });
 
   await container.start();

@@ -15,7 +15,7 @@ const runTask = async (taskId: string, command: string,repoUrl:string) => {
         else{
             logger.info(`Repository cloned successfully`);
         }
-        const container = await dockerWorker.createContainer("ayush")
+        const container = await dockerWorker.createContainer(taskId)
         logger.info(`Container created with ID: ${container.id}`);
         
         const result = await dockerWorker.exec(container.id, command);

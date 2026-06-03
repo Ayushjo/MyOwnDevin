@@ -52,7 +52,10 @@ async function read_file(containerId:string,filePath:string):Promise<ToolResult>
 
 async function write_file(containerId:string,filePath:string,content:string):Promise<ToolResult>{
     try {
-        const result = await dockerWorker.exec(containerId,`echo "${content}" > ${filePath}`)
+        const result = await dockerWorker.exec(
+            containerId,
+            `cat > ${filePath} << 'EOF'\n${content}\nEOF`
+          )
         if(result?.exitCode!=0){
             logger.error(`Error writing file: ${result?.stderr}`);
             return {success:false,output:"",error:`Error writing file: ${result?.stderr}`}
