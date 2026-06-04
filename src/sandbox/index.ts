@@ -6,6 +6,7 @@ import {fileURLToPath} from 'url';
 import { PassThrough } from 'stream';
 import { stdout } from 'process';
 import { getTaskPath } from '../utils/taskPath.js';
+import { rejects } from 'assert';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export class SandboxManager {
@@ -38,13 +39,14 @@ export class SandboxManager {
 logger.info(`Created container: ${taskId} with ID: ${container.id}`);
 return container
   } // returns containerId
-  async exec(containerId: string, command: string){
+  async exec(containerId: string, command: string,timeoutMs:number){
     try {
       const container = docker.getContainer(containerId);
       const exec = await container.exec({
         Cmd: ['sh', '-c', command],
         AttachStdout: true,
         AttachStderr: true,
+    
       });
       const stream =await exec.start({hijack:true,stdin:false})
       const stdOutStream = new PassThrough()
@@ -55,10 +57,19 @@ return container
       let stderr = ""
       stdOutStream.on("data",(chunk)=>{stdout+=chunk.toString()})
       stdErrStream.on("data",(chunk)=>{stderr+=chunk.toString()})
-      await new Promise<void>((resolve,reject)=>{
-        stream.on("end",resolve)
-        stream.on("error",reject)
-      })
+      await Promise.race([
+        new Promise<void>((resolve,reject)=>{
+          stream.on("end",resolve)
+          stream.on("error",reject)
+        }),
+        new Promise<void>((_,reject)=>{
+          setTimeout(()=>{
+            reject(new Error(`Command timed out after ${timeoutMs}ms`))
+          },timeoutMs)
+        })
+
+      ])
+      
       const inspect = await exec.inspect()
       const exitCode = inspect.ExitCode ?? -1
       logger.info(`stdout: ${stdout}`)

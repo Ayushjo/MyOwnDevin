@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.10",
     "@types/winston": "^2.4.4",

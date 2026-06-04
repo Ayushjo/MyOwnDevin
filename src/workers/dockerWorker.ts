@@ -18,7 +18,7 @@ const runTask = async (taskId: string, command: string,repoUrl:string) => {
         const container = await dockerWorker.createContainer(taskId)
         logger.info(`Container created with ID: ${container.id}`);
         
-        const result = await dockerWorker.exec(container.id, command);
+        const result = await dockerWorker.exec(container.id, command,10000);
         
         if (result?.exitCode!=0){
             throw new Error(`Command failed with exit code ${result?.exitCode}`);
