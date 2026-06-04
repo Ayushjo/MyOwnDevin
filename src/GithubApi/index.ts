@@ -24,6 +24,7 @@ export class GithubApi{
             const {data} = await this.octokit.rest.issues.get({
                 owner,repo,issue_number:issueNumber
             })
+            
             logger.info("Issue: "+JSON.stringify(data))
             return data
         } catch (error) {
