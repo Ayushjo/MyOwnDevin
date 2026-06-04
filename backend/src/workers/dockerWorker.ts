@@ -44,5 +44,3 @@ const killContainer = async (containerId: string) => {
         logger.error(`Error killing container ${containerId}: ${e}`);
     }
 }
-
-killContainer("01e8539926cb4754a4e7581c33bdf025fd7087b99f85a19966ff41e67c3c4fd2")

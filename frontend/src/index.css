@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    @apply bg-base text-slate-200 font-sans antialiased;
+    margin: 0;
+    background-image: radial-gradient(ellipse 80% 50% at 50% -5%, rgba(99,102,241,0.07) 0%, transparent 70%);
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { @apply bg-surface; }
+  ::-webkit-scrollbar-thumb { @apply bg-subtle rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.4); }
+}
+
+@layer components {
+  .glass {
+    background: rgba(7, 11, 20, 0.75);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(30, 45, 66, 0.5);
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 border border-subtle;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    border-color: rgba(99,102,241,0.35);
+    box-shadow: 0 0 16px rgba(99,102,241,0.12);
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white font-medium px-5 py-2.5 rounded-lg transition-all duration-200 text-sm;
+  }
+  .btn-primary:hover {
+    background: #818CF8;
+    box-shadow: 0 0 22px rgba(99,102,241,0.4);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    @apply text-slate-400 hover:text-slate-200 px-4 py-2 rounded-lg transition-colors duration-150 text-sm font-medium;
+  }
+
+  .input-field {
+    @apply bg-surface border border-subtle rounded-xl text-slate-200 placeholder-slate-600 outline-none transition-all duration-200 w-full;
+  }
+  .input-field:focus {
+    border-color: rgba(99,102,241,0.6);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  }
+}
+
+/* Flowing dashed SVG line */
+@keyframes flowDash {
+  to { stroke-dashoffset: -20; }
+}
+.flow-line {
+  animation: flowDash 1.2s linear infinite;
+}
+
+/* Terminal cursor */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.cursor-blink { animation: blink 1s step-end infinite; }
+
+/* Dot-grid texture */
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(30,45,66,0.5) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+/* Hero right-side glow */
+.hero-glow {
+  background: radial-gradient(ellipse 55% 55% at 60% 50%, rgba(99,102,241,0.13) 0%, transparent 70%);
+}
+
+/* Log line entrance */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.log-line { animation: fadeUp 0.25s ease both; }
+
+/* Running status ring */
+@keyframes pingRing {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+.ping-ring {
+  animation: pingRing 1.8s cubic-bezier(0,0,0.2,1) infinite;
+}
