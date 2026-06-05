@@ -15,7 +15,12 @@ export class PlannerAgent{
     async plan(issueBody:string):Promise <Step[]>{
         try {
             const reponse = await this.brain.run(issueBody)
-            const steps = JSON.parse(reponse) 
+            // Claude sometimes wraps the JSON in ```json ... ``` fences — strip them
+            const jsonStr = reponse
+                .replace(/^```(?:json)?\s*/m, '')
+                .replace(/\s*```\s*$/m, '')
+                .trim()
+            const steps = JSON.parse(jsonStr)
             logger.info("Steps: "+JSON.stringify(steps))
             return steps
         } catch (error) {
