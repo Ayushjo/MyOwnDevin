@@ -13,8 +13,8 @@ export class CheckpointStore {
     private redis:Redis
     private TTL=60*60*24 // 24 hours
     constructor(){
-        this.redis = new Redis(process.env.REDIS_URL ?? "",{
-            maxRetriesPerRequest:null,
+        this.redis = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6379", {
+            maxRetriesPerRequest: null,
         })
 
     }

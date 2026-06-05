@@ -15,8 +15,8 @@ export const redisConnection = {
 
 export const taskQueue = new Queue("tasks",{connection:redisConnection})
 
-export const startWorker = (eventBus:EventBus)=>{
-    const checkpointStore = new CheckpointStore()
+export const startWorker = (eventBus:EventBus,checkpointStore:CheckpointStore)=>{
+    
     const orchestrator = new AgentOrchestrator(eventBus,checkpointStore)
     const worker = new Worker("tasks",async (job)=>{
         const {taskId,issueUrl} = job.data

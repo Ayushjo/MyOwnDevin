@@ -32,7 +32,7 @@ app.use(
 
 const eventBus = new EventBus();
 const checkpointStore = new CheckpointStore();
-const worker = startWorker(eventBus);
+const worker = startWorker(eventBus,checkpointStore);
 app.use("/api", createRouter(eventBus, checkpointStore));
 const PORT = process.env.PORT || 3500
 app.listen(PORT,()=>{
