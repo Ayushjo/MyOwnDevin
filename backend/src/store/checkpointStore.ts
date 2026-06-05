@@ -1,5 +1,5 @@
 import type { Step } from "../Agents/plannerAgent.js"
-
+import {Redis} from "ioredis"
 export type CheckpointState = {
     steps: Step[]
     completedStepIds: number[]
@@ -9,19 +9,27 @@ export type CheckpointState = {
     issueNumber: number
 }
 
-// In-memory store for now. Phase 5 will swap this for Redis.
 export class CheckpointStore {
-    private store = new Map<string, CheckpointState>()
+    private redis:Redis
+    private TTL=60*60*24 // 24 hours
+    constructor(){
+        this.redis = new Redis(process.env.REDIS_URL ?? "",{
+            maxRetriesPerRequest:null,
+        })
+
+    }
 
     async save(taskId: string, state: CheckpointState): Promise<void> {
-        this.store.set(taskId, state)
+        await this.redis.set(`checkpoint:${taskId}`,
+            JSON.stringify(state),
+            "EX",
+            this.TTL)
     }
-
     async load(taskId: string): Promise<CheckpointState | null> {
-        return this.store.get(taskId) ?? null
+        const data = await this.redis.get(`checkpoint:${taskId}`)
+        return data ? JSON.parse(data) : null
     }
-
     async delete(taskId: string): Promise<void> {
-        this.store.delete(taskId)
+        await this.redis.del(`checkpoint:${taskId}`)
     }
 }
