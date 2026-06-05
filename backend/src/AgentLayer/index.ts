@@ -1,7 +1,7 @@
 import logger from "../logger.js";
 import type ToolExecutor from "../tools/index.js";
-import Anthropic from "@anthropic-ai/sdk";
-import type { ToolUnion } from "@anthropic-ai/sdk/resources/messages/messages";
+import { Anthropic } from "@anthropic-ai/sdk";
+import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages/messages.js";
 export const TOOLS = [
     {
       name: "run_shell",
@@ -104,14 +104,14 @@ export const TOOLS = [
     error? : string
 }
   type Message = {
-    role: "user" | "assistant" 
-    content:string | Anthropic.Messages.ContentBlock[]
+    role: "user" | "assistant"
+    content: string | ContentBlock[]
   }
 
 
 export class AgentBrain{
     private history:Message[] = [];
-    private client:Anthropic;
+    private client: Anthropic;
     constructor(private systemPrompt:string,private toolExecutor?:ToolExecutor){
         this.systemPrompt = systemPrompt;
         if(toolExecutor){
@@ -148,7 +148,7 @@ export class AgentBrain{
       
             // Claude is done — extract text and return
             if (response.stop_reason === "end_turn") {
-              const textBlock = response.content.find(b => b.type === "text")
+              const textBlock = response.content.find((b: ContentBlock) => b.type === "text")
               return textBlock ? textBlock.text : ""
             }
       

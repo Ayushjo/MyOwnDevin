@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "tsc -b && node dist/index.js",
-    "dev": "nodemon --watch src --ext ts --exec node --loader ts-node/esm src/index.ts"
+    "dev": "nodemon --watch src --ext ts --exec \"node --env-file=.env --loader ts-node/esm src/index.ts\""
   },
   "keywords": [],
   "author": "",
@@ -28,7 +28,7 @@
     "octokit": "^5.0.5",
     "simple-git": "^3.36.0",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.3",
+    "typescript": "^5.8.3",
     "uuid": "^14.0.0",
     "winston": "^3.19.0"
   },
