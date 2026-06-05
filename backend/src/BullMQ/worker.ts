@@ -22,5 +22,11 @@ export const startWorker = (eventBus:EventBus)=>{
         const {taskId,issueUrl} = job.data
         await orchestrator.run(taskId,issueUrl)
     },{connection:redisConnection})
+
+    worker.on("failed", (job, err) => {
+        const taskId = job?.data?.taskId ?? "unknown"
+        console.error(`Job failed [taskId=${taskId}]:`, err.message)
+    })
+
     return worker
 }

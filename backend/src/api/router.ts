@@ -4,8 +4,9 @@ import logger from "../logger.js";
 import { v4 as uuidv4 } from "uuid";
 import { taskQueue } from "../BullMQ/worker.js";
 import { EventBus } from "../events/eventBus.js";
+import type { CheckpointStore } from "../store/checkpointStore.js";
 
-export const createRouter = (eventBus: EventBus) => {
+export const createRouter = (eventBus: EventBus, checkpointStore: CheckpointStore) => {
   const router = Router();
 
   router.post("/task", async (req, res) => {
@@ -46,6 +47,20 @@ export const createRouter = (eventBus: EventBus) => {
     req.on("close", () => {
       eventBus.cleanup(taskId)
     })
+  })
+
+  router.get("/task/:taskId", async (req, res) => {
+    const { taskId } = req.params
+    try {
+      const state = await checkpointStore.load(taskId)
+      if (!state) {
+        return res.status(404).json({ error: "Task not found" })
+      }
+      res.status(200).json(state)
+    } catch (error) {
+      logger.error("Error fetching task state: " + error)
+      res.status(500).json({ error: "Internal server error" })
+    }
   })
 
   return router;
