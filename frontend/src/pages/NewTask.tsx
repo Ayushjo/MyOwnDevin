@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import { createTask } from '../api/client'
+import { addTask } from '../store/taskStore'
 
-// GitHub mark icon
 function GitHubIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-slate-500">
@@ -19,24 +20,68 @@ function GitHubIcon() {
   )
 }
 
+function SpinnerIcon() {
+  return (
+    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 const STEPS_PREVIEW = ['Plan steps', 'Execute in sandbox', 'Open pull request']
 
+/** Extract issue number + owner/repo from a GitHub issue URL. */
+function parseGitHubUrl(url: string) {
+  const numMatch  = url.match(/\/issues\/(\d+)/)
+  const repoMatch = url.match(/github\.com\/([^/]+\/[^/]+)\/issues/)
+  return {
+    issueNumber: numMatch  ? parseInt(numMatch[1]!)  : 0,
+    repoName:    repoMatch ? repoMatch[1]!           : 'unknown',
+  }
+}
+
 export default function NewTask() {
-  const [url, setUrl] = useState('')
-  const [error, setError] = useState('')
+  const [url,     setUrl]     = useState('')
+  const [error,   setError]   = useState('')
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  const isValidUrl = url.match(/github\.com\/.+\/.+\/issues\/\d+/)
+  const isValidUrl = /github\.com\/.+\/.+\/issues\/\d+/.test(url)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
     if (!isValidUrl) {
       setError('Please enter a valid GitHub issue URL, e.g. https://github.com/owner/repo/issues/42')
       return
     }
-    // In Phase 6: POST /api/task and redirect to /tasks/:taskId
-    // For now navigate to the mock task view
-    navigate('/tasks/task-a1b2c3')
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const { taskId } = await createTask(url)
+      const { issueNumber, repoName } = parseGitHubUrl(url)
+
+      // Persist to localStorage so Dashboard can list it without a backend list endpoint.
+      addTask({
+        id:          taskId,
+        issueUrl:    url,
+        issueTitle:  `Issue #${issueNumber}`,   // placeholder — updated by useTaskStream once checkpoint exists
+        issueNumber,
+        repoName,
+        branchName:  `devin/task-${taskId}`,
+        status:      'running',
+        steps:       [],
+        createdAt:   new Date().toISOString(),
+      })
+
+      navigate(`/tasks/${taskId}`)
+    } catch {
+      setError('Failed to create task. Is the backend running on port 3500?')
+      setLoading(false)
+    }
   }
 
   return (
@@ -45,11 +90,13 @@ export default function NewTask() {
 
       <main className="flex-1 flex items-center justify-center px-6 pt-14">
         <div className="w-full max-w-lg">
+
           {/* Back link */}
-          <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-slate-500
-            hover:text-slate-300 text-sm mb-8 transition-colors">
+          <Link to="/dashboard"
+            className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-300 text-sm mb-8 transition-colors">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.5"
+                strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Dashboard
           </Link>
@@ -62,7 +109,6 @@ export default function NewTask() {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* URL input */}
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5">
                   GitHub Issue URL
@@ -78,25 +124,26 @@ export default function NewTask() {
                     placeholder="https://github.com/owner/repo/issues/42"
                     className="input-field pl-10 pr-4 py-3 text-sm"
                     autoFocus
+                    disabled={loading}
                   />
                 </div>
                 {error && <p className="text-danger text-xs mt-1.5">{error}</p>}
               </div>
 
-              {/* Submit */}
               <button
                 type="submit"
-                disabled={!url}
+                disabled={!url || loading}
                 className={`w-full py-3 rounded-xl font-semibold text-sm transition-all duration-200
-                  ${url
+                  flex items-center justify-center gap-2
+                  ${url && !loading
                     ? 'bg-primary text-white hover:bg-primary-light hover:shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5'
                     : 'bg-elevated text-slate-600 cursor-not-allowed'}`}
               >
-                Start Agent →
+                {loading ? <><SpinnerIcon /> Starting agent...</> : 'Start Agent →'}
               </button>
             </form>
 
-            {/* Mini flow */}
+            {/* Mini flow preview */}
             <div className="flex items-center justify-center gap-2 mt-6">
               {STEPS_PREVIEW.map((s, i) => (
                 <div key={s} className="flex items-center gap-2">
@@ -111,6 +158,7 @@ export default function NewTask() {
               ))}
             </div>
           </div>
+
         </div>
       </main>
     </div>
