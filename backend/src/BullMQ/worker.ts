@@ -16,7 +16,12 @@ export const redisConnection = {
 export const taskQueue = new Queue("tasks",{connection:redisConnection})
 
 export const startWorker = (eventBus:EventBus,checkpointStore:CheckpointStore)=>{
-    
+
+    // Drain stale failed/delayed jobs from previous server runs so they don't
+    // unexpectedly re-run on startup. Active (waiting/processing) jobs are left alone.
+    taskQueue.clean(0, 1000, 'failed').catch(() => {})
+    taskQueue.clean(0, 1000, 'delayed').catch(() => {})
+
     const orchestrator = new AgentOrchestrator(eventBus,checkpointStore)
     const worker = new Worker("tasks",async (job)=>{
         const {taskId,issueUrl} = job.data
