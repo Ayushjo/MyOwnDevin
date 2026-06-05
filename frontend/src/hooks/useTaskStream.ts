@@ -1,53 +1,89 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import type { TaskEvent, Step } from '../types/task'
-import { MOCK_STEPS, MOCK_EVENTS } from '../data/mockData'
-
-// Stub — replays mock events with delays to simulate live streaming.
-// In Phase 6: replace the useEffect body with a real EventSource connection:
-//   const source = new EventSource(`/api/task/${taskId}/stream`)
-//   source.onmessage = (e) => setEvents(prev => [...prev, JSON.parse(e.data)])
-//   return () => source.close()
+import { openTaskStream, getTaskState } from '../api/client'
+import { updateTask } from '../store/taskStore'
 
 export function useTaskStream(taskId: string) {
-  const [events, setEvents] = useState<TaskEvent[]>([])
-  const [steps, setSteps] = useState<Step[]>(MOCK_STEPS)
+  const [events,    setEvents]    = useState<TaskEvent[]>([])
+  const [steps,     setSteps]     = useState<Step[]>([])
   const [isRunning, setIsRunning] = useState(true)
-  const indexRef = useRef(0)
 
   useEffect(() => {
-    indexRef.current = 0
+    if (!taskId) return
+
     setEvents([])
-    setSteps(MOCK_STEPS)
+    setSteps([])
     setIsRunning(true)
 
-    const tick = () => {
-      const i = indexRef.current
-      if (i >= MOCK_EVENTS.length) {
-        setIsRunning(false)
-        return
+    // ── Hydrate existing steps from checkpoint ──────────────────────
+    // Handles resumed tasks — steps already completed won't fire step_start again.
+    getTaskState(taskId).then(state => {
+      if (!state) return
+
+      if (Array.isArray(state.steps)) {
+        const completedIds = (state.completedStepIds as number[]) ?? []
+        setSteps(
+          (state.steps as Array<{ id: number; description: string }>).map(s => ({
+            id:          s.id,
+            description: s.description,
+            status:      completedIds.includes(s.id) ? 'done' : 'pending',
+          }))
+        )
       }
 
-      const event = MOCK_EVENTS[i]!
+      // Back-fill title / issue number into localStorage
+      if (state.issueTitle) {
+        updateTask(taskId, {
+          issueTitle:  state.issueTitle  as string,
+          issueNumber: state.issueNumber as number,
+        })
+      }
+    })
+
+    // ── Connect to the SSE stream ───────────────────────────────────
+    const source = openTaskStream(taskId)
+
+    source.onmessage = (e: MessageEvent<string>) => {
+      const event = JSON.parse(e.data) as TaskEvent
       setEvents(prev => [...prev, event])
 
-      // Update step statuses as events arrive
       if (event.type === 'step_start') {
-        setSteps(prev => prev.map(s =>
-          s.id === event.step.id ? { ...s, status: 'running' } : s
-        ))
-      }
-      if (event.type === 'step_done') {
-        setSteps(prev => prev.map(s =>
-          s.status === 'running' ? { ...s, status: 'done' } : s
-        ))
+        setSteps(prev => {
+          const exists = prev.find(s => s.id === event.step.id)
+          if (exists) {
+            return prev.map(s =>
+              s.id === event.step.id ? { ...s, status: 'running' } : s
+            )
+          }
+          return [...prev, { ...event.step, status: 'running' }]
+        })
       }
 
-      indexRef.current++
-      setTimeout(tick, 900)
+      if (event.type === 'step_done') {
+        setSteps(prev =>
+          prev.map(s => s.status === 'running' ? { ...s, status: 'done' } : s)
+        )
+      }
+
+      if (event.type === 'task_complete') {
+        setIsRunning(false)
+        updateTask(taskId, { status: 'done', prUrl: event.prUrl })
+        source.close()
+      }
+
+      if (event.type === 'task_failed') {
+        setIsRunning(false)
+        updateTask(taskId, { status: 'failed' })
+        source.close()
+      }
     }
 
-    const timer = setTimeout(tick, 500)
-    return () => clearTimeout(timer)
+    source.onerror = () => {
+      setIsRunning(false)
+      source.close()
+    }
+
+    return () => source.close()
   }, [taskId])
 
   return { events, steps, isRunning }
