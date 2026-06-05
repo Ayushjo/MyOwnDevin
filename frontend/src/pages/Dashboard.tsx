@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import TaskCard from '../components/TaskCard'
-import { MOCK_TASKS } from '../data/mockData'
+import { getTasks, type StoredTask } from '../store/taskStore'
 import type { TaskStatus } from '../types/task'
 
 type Filter = 'all' | TaskStatus
@@ -12,14 +12,6 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'running', label: 'Running' },
   { key: 'done',    label: 'Completed' },
   { key: 'failed',  label: 'Failed' },
-]
-
-// Mock stats — will come from BullMQ job counts in Phase 6
-const STATS = [
-  { label: 'Total',     value: MOCK_TASKS.length,                                 color: 'text-slate-200' },
-  { label: 'Running',   value: MOCK_TASKS.filter(t => t.status === 'running').length, color: 'text-warning' },
-  { label: 'Completed', value: MOCK_TASKS.filter(t => t.status === 'done').length,    color: 'text-success' },
-  { label: 'Failed',    value: MOCK_TASKS.filter(t => t.status === 'failed').length,  color: 'text-danger' },
 ]
 
 function EmptyState() {
@@ -44,11 +36,24 @@ function EmptyState() {
 }
 
 export default function Dashboard() {
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter,   setFilter]   = useState<Filter>('all')
+  const [allTasks, setAllTasks] = useState<StoredTask[]>([])
 
-  const tasks = filter === 'all'
-    ? MOCK_TASKS
-    : MOCK_TASKS.filter(t => t.status === filter)
+  // Load from localStorage on mount; re-read when the user navigates back here.
+  useEffect(() => {
+    setAllTasks(getTasks())
+  }, [])
+
+  const filtered = filter === 'all'
+    ? allTasks
+    : allTasks.filter(t => t.status === filter)
+
+  const stats = [
+    { label: 'Total',     value: allTasks.length,                                     color: 'text-slate-200' },
+    { label: 'Running',   value: allTasks.filter(t => t.status === 'running').length,  color: 'text-warning'   },
+    { label: 'Completed', value: allTasks.filter(t => t.status === 'done').length,     color: 'text-success'   },
+    { label: 'Failed',    value: allTasks.filter(t => t.status === 'failed').length,   color: 'text-danger'    },
+  ]
 
   return (
     <div className="min-h-screen">
@@ -66,7 +71,7 @@ export default function Dashboard() {
 
         {/* Stats strip */}
         <div className="grid grid-cols-4 gap-3 mb-8">
-          {STATS.map(s => (
+          {stats.map(s => (
             <div key={s.label} className="bg-surface border border-subtle rounded-xl p-4">
               <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
               <p className="text-slate-500 text-xs mt-0.5">{s.label}</p>
@@ -91,13 +96,18 @@ export default function Dashboard() {
         </div>
 
         {/* Task list */}
-        {tasks.length === 0 ? (
+        {allTasks.length === 0 ? (
           <EmptyState />
+        ) : filtered.length === 0 ? (
+          <p className="text-slate-500 text-sm py-12 text-center">
+            No {filter} tasks.
+          </p>
         ) : (
           <div className="flex flex-col gap-2.5">
-            {tasks.map(task => <TaskCard key={task.id} task={task} />)}
+            {filtered.map(task => <TaskCard key={task.id} task={task} />)}
           </div>
         )}
+
       </main>
     </div>
   )
