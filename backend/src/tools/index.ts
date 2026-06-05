@@ -17,7 +17,7 @@ export default class ToolExecutor{
         this.dockerWorker = new SandboxManager();
         this.containerId = containerId;
     }
-    async run_shell(command:string,timeoutMs:number):Promise<ToolResult>{
+    async run_shell(command:string, timeoutMs = 30_000):Promise<ToolResult>{
         try {
             const result = await this.dockerWorker.exec(this.containerId,command,timeoutMs)
             if(result?.exitCode!=0){
@@ -36,7 +36,7 @@ export default class ToolExecutor{
     
     
     }
-    async read_file(filePath:string,timeoutMs:number):Promise<ToolResult>{
+    async read_file(filePath:string, timeoutMs = 30_000):Promise<ToolResult>{
         try {
             const result = await this.dockerWorker.exec(this.containerId,`cat ${filePath}`,timeoutMs)
             if(result?.exitCode!=0){
@@ -55,7 +55,7 @@ export default class ToolExecutor{
         }
     }
     
-    async write_file(filePath:string,content:string,timeoutMs:number):Promise<ToolResult>{
+    async write_file(filePath:string,content:string, timeoutMs = 30_000):Promise<ToolResult>{
         try {
             const result = await this.dockerWorker.exec(
                 this.containerId,
@@ -76,7 +76,7 @@ export default class ToolExecutor{
         }
     }
     
-    async git_commit(message:string,timeoutMs:number):Promise<ToolResult>{
+    async git_commit(message:string, timeoutMs = 30_000):Promise<ToolResult>{
         try {
             const result = await this.run_shell(`git add -A && git commit -m "${message}"`,timeoutMs)
             return result
@@ -86,7 +86,7 @@ export default class ToolExecutor{
             return {success:false,output:"",error:`Error committing: ${error}`}
         }
     }
-    async git_checkout(branch:string,timeoutMs:number):Promise<ToolResult>{
+    async git_checkout(branch:string, timeoutMs = 30_000):Promise<ToolResult>{
         try {
             const result = await this.run_shell(`git checkout ${branch}`,timeoutMs)
             return result

@@ -39,7 +39,7 @@ export class SandboxManager {
 logger.info(`Created container: ${taskId} with ID: ${container.id}`);
 return container
   } // returns containerId
-  async exec(containerId: string, command: string,timeoutMs:number){
+  async exec(containerId: string, command: string, timeoutMs = 30_000){
     try {
       const container = docker.getContainer(containerId);
       const exec = await container.exec({
@@ -79,6 +79,7 @@ return container
       
     } catch (error) {
       logger.error(`Error executing command in container ${containerId}: ${error}`);
+      throw error   // propagate so ToolExecutor catches it properly
     }
 
   }
