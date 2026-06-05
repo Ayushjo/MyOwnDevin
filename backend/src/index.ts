@@ -3,6 +3,9 @@ import morgan from "morgan"
 import logger from "./logger.js"
 import dotenv from "dotenv"
 import {SandboxManager} from "./sandbox/index.js"
+import { EventBus } from './events/eventBus.js';
+import { startWorker } from './BullMQ/worker.js';
+import { createRouter } from './api/router.js';
 dotenv.config();
 const app = express();
 
@@ -24,23 +27,11 @@ app.use(
     },
   })
 );
-const sandboxManager = new SandboxManager();
+
+const eventBus = new EventBus();
+const worker = startWorker(eventBus);
+app.use("/api",createRouter(eventBus));
 const PORT = process.env.PORT || 3500
 app.listen(PORT,()=>{
     logger.info(`Server is running on port ${PORT}`);
-})
-app.get("/build",async(req,res)=>{
-    try{
-        await sandboxManager.buildImage().then(()=>{
-            res.send("Image built successfully");
-            logger.info("Image built successfully");
-        }
-    )
-
-    }
-    catch(e){
-        logger.error(`Error building image: ${e}`);
-        res.status(500).send("Error building image");
-    }
-    
 })
