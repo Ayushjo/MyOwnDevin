@@ -74,6 +74,12 @@
 }
 .cursor-blink { animation: blink 1s step-end infinite; }
 
+/* Light page — overrides the dark body for the home landing page */
+.light-page {
+  background: #F7F8FC;
+  color: #0F172A;
+}
+
 /* Dot-grid texture */
 .dot-grid {
   background-image: radial-gradient(circle, rgba(30,45,66,0.5) 1px, transparent 1px);
