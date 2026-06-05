@@ -2,209 +2,189 @@ import { useRef } from 'react'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 
-gsap.registerPlugin()
-
-// Box data: label, sublabel, icon path
-const STAGES = [
-  {
-    label: 'GitHub Issue',
-    sub: 'Problem statement',
-    icon: (
-      // Issue icon: circle with dot and line
-      <g>
-        <circle cx="75" cy="62" r="10" stroke="#94A3B8" strokeWidth="1.5" fill="none" />
-        <circle cx="75" cy="58" r="1.5" fill="#94A3B8" />
-        <line x1="75" y1="62" x2="75" y2="68" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" />
-      </g>
-    ),
-  },
-  {
-    label: 'AI Plan',
-    sub: 'Ordered steps',
-    icon: (
-      // Tree/plan icon: top node branching to two
-      <g>
-        <circle cx="265" cy="52" r="4" fill="#6366F1" />
-        <line x1="265" y1="56" x2="257" y2="66" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
-        <line x1="265" y1="56" x2="273" y2="66" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
-        <circle cx="257" cy="68" r="3" fill="none" stroke="#6366F1" strokeWidth="1.5" />
-        <circle cx="273" cy="68" r="3" fill="none" stroke="#6366F1" strokeWidth="1.5" />
-      </g>
-    ),
-  },
-  {
-    label: 'Execute',
-    sub: 'Sandbox + tools',
-    icon: (
-      // Terminal prompt: >_
-      <g>
-        <text x="449" y="68" fill="#10B981" fontSize="14" fontFamily="monospace" fontWeight="500">&gt;_</text>
-      </g>
-    ),
-  },
-  {
-    label: 'Pull Request',
-    sub: 'Automated PR',
-    icon: (
-      // Git branch: two lines merging
-      <g>
-        <circle cx="638" cy="52" r="3.5" fill="none" stroke="#C084FC" strokeWidth="1.5" />
-        <circle cx="648" cy="52" r="3.5" fill="none" stroke="#C084FC" strokeWidth="1.5" />
-        <circle cx="643" cy="70" r="3.5" fill="#C084FC" />
-        <line x1="638" y1="55.5" x2="641" y2="66.5" stroke="#C084FC" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
-        <line x1="648" y1="55.5" x2="645" y2="66.5" stroke="#C084FC" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
-      </g>
-    ),
-  },
-]
-
-// Box positions: x offsets for each stage
-const BOX_W = 140
-const BOX_H = 80
-const BOXES = [
-  { x: 5,   y: 30 },
-  { x: 195, y: 30 },
-  { x: 385, y: 30 },
-  { x: 575, y: 30 },
-]
-const CONNECTORS = [
-  { x1: 145, x2: 195, y: 70 },
-  { x1: 335, x2: 385, y: 70 },
-  { x1: 525, x2: 575, y: 70 },
-]
+// ── Dimensions ─────────────────────────────────────────
+const LINE_H   = 27
+const TOPBAR_H = 33
+const lineY    = (i: number) => TOPBAR_H + i * LINE_H
+const textY    = (i: number) => lineY(i) + 18   // text baseline inside each row
+const EDITOR_H = TOPBAR_H + 7 * LINE_H + 6      // 228
+const SVG_H    = EDITOR_H + 48                   // 276
 
 export default function HeroFlow() {
-  const dot1 = useRef<SVGCircleElement>(null)
-  const dot2 = useRef<SVGCircleElement>(null)
-  const dot3 = useRef<SVGCircleElement>(null)
-  const box1 = useRef<SVGRectElement>(null)
-  const box2 = useRef<SVGRectElement>(null)
-  const box3 = useRef<SVGRectElement>(null)
-  const box4 = useRef<SVGRectElement>(null)
-  const containerRef = useRef<SVGSVGElement>(null)
+  const svgRef      = useRef<SVGSVGElement>(null)
+  const revealRef   = useRef<SVGRectElement>(null)   // clip rect that "types" green text
+  const greenRef    = useRef<SVGGElement>(null)       // green added-line group
+  const redRef      = useRef<SVGGElement>(null)       // red deleted-line group
+  const prBadgeRef  = useRef<SVGGElement>(null)       // PR badge below editor
 
   useGSAP(() => {
-    const dots = [
-      { ref: dot1, x1: 145, x2: 193 },
-      { ref: dot2, x1: 335, x2: 383 },
-      { ref: dot3, x1: 525, x2: 573 },
-    ]
+    // ── initial state ──
+    gsap.set(greenRef.current,   { opacity: 0 })
+    gsap.set(prBadgeRef.current, { opacity: 0, y: 8 })
+    gsap.set(revealRef.current,  { attr: { width: 0 } })
 
-    // Animate each dot along its connector, staggered
-    dots.forEach(({ ref, x1, x2 }, i) => {
-      gsap.fromTo(
-        ref.current,
-        { attr: { cx: x1 }, opacity: 0 },
-        {
-          attr: { cx: x2 },
-          opacity: 1,
-          duration: 0.7,
-          repeat: -1,
-          ease: 'power1.inOut',
-          repeatDelay: 2.1,
-          delay: i * 0.75,
-          yoyo: false,
-          onRepeat() {
-            gsap.set(ref.current, { attr: { cx: x1 }, opacity: 0 })
-          },
-        }
-      )
-    })
+    const tl = gsap.timeline({ repeat: -1, repeatDelay: 1.5 })
 
-    // Sequential box highlight wave
-    const boxes = [box1, box2, box3, box4]
-    const tl = gsap.timeline({ repeat: -1, delay: 0.3 })
-    boxes.forEach(b => {
-      tl.to(b.current, { attr: { strokeOpacity: 1, strokeWidth: 1.5 }, duration: 0.35, ease: 'power1.out' })
-        .to(b.current, { attr: { strokeOpacity: 0.35, strokeWidth: 1 }, duration: 0.5, ease: 'power1.in' }, '+=0.4')
-    })
-  }, { scope: containerRef })
+    // Phase 1 – pause: show the broken code
+    tl.to({}, { duration: 1.2 })
+
+    // Phase 2 – red line pulses: AI analyzing the bug
+    tl.to(redRef.current, { opacity: 0.3, duration: 0.18, yoyo: true, repeat: 5, ease: 'none' })
+
+    // Phase 3 – green fix types in left-to-right
+    tl.set(greenRef.current,  { opacity: 1 })
+    tl.to(revealRef.current,  { attr: { width: 330 }, duration: 1.5, ease: 'none' })
+
+    // Phase 4 – red line fades away (fix replaces it)
+    tl.to(redRef.current, { opacity: 0, duration: 0.38 }, '-=0.55')
+
+    // Phase 5 – PR badge pops up
+    tl.to(prBadgeRef.current, { opacity: 1, y: 0, duration: 0.44, ease: 'back.out(1.4)' }, '+=0.22')
+
+    // Hold for reading
+    tl.to({}, { duration: 2.3 })
+
+    // Reset for next loop
+    tl.set(redRef.current,    { opacity: 1 })
+    tl.set(greenRef.current,  { opacity: 0 })
+    tl.set(revealRef.current, { attr: { width: 0 } })
+    tl.set(prBadgeRef.current, { opacity: 0, y: 8 })
+  }, { scope: svgRef })
 
   return (
     <svg
-      ref={containerRef}
-      viewBox="0 0 720 140"
+      ref={svgRef}
+      viewBox={`0 0 540 ${SVG_H}`}
       fill="none"
-      className="w-full max-w-2xl"
+      className="w-full max-w-xl drop-shadow-2xl"
       aria-hidden="true"
     >
       <defs>
-        <filter id="glow-primary">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <filter id="glow-dot">
-          <feGaussianBlur stdDeviation="2.5" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
+        {/* Clip rect that reveals the green fix text left-to-right */}
+        <clipPath id="hfGreenReveal">
+          <rect ref={revealRef} x="74" y={lineY(4)} width="0" height={LINE_H} />
+        </clipPath>
       </defs>
 
-      {/* Stage boxes */}
-      {BOXES.map((b, i) => (
-        <g key={i}>
-          <rect
-            ref={i === 0 ? box1 : i === 1 ? box2 : i === 2 ? box3 : box4}
-            x={b.x} y={b.y}
-            width={BOX_W} height={BOX_H}
-            rx="10"
-            fill="#0D1320"
-            stroke="#6366F1"
-            strokeOpacity="0.35"
-            strokeWidth="1"
-          />
-          {/* Icon */}
-          {STAGES[i]?.icon}
-          {/* Label */}
-          <text
-            x={b.x + BOX_W / 2} y={b.y + BOX_H + 18}
-            textAnchor="middle"
-            fill="#E2E8F0"
-            fontSize="12"
-            fontFamily="Inter, sans-serif"
-            fontWeight="500"
-          >
-            {STAGES[i]?.label}
-          </text>
-          <text
-            x={b.x + BOX_W / 2} y={b.y + BOX_H + 32}
-            textAnchor="middle"
-            fill="#64748B"
-            fontSize="10"
-            fontFamily="Inter, sans-serif"
-          >
-            {STAGES[i]?.sub}
+      {/* ── Editor shell ──────────────────────────────────── */}
+      <rect x="0" y="0" width="540" height={EDITOR_H} rx="10" fill="#07111e" />
+      <rect x="0" y="0" width="540" height={EDITOR_H} rx="10"
+        stroke="#1a2845" strokeWidth="1" />
+
+      {/* Title bar */}
+      <rect x="0" y="0" width="540" height={TOPBAR_H} rx="10" fill="#0d1729" />
+      {/* Square off the bottom corners of the title bar */}
+      <rect x="0" y={TOPBAR_H - 5} width="540" height="5" fill="#0d1729" />
+      <line x1="0" y1={TOPBAR_H} x2="540" y2={TOPBAR_H} stroke="#1a2845" strokeWidth="1" />
+
+      {/* macOS traffic lights */}
+      <circle cx="15" cy="17" r="4.5" fill="#ff5f57" />
+      <circle cx="29" cy="17" r="4.5" fill="#febc2e" />
+      <circle cx="43" cy="17" r="4.5" fill="#28c840" />
+
+      {/* Separator + TypeScript badge + file path */}
+      <line x1="57" y1="9" x2="57" y2="25" stroke="#1a2845" strokeWidth="1" />
+      <rect x="65" y="10" width="20" height="13" rx="3" fill="#3178c6" />
+      <text x="75" y="20.5" fill="white" fontSize="8" fontFamily="monospace"
+        fontWeight="bold" textAnchor="middle">ts</text>
+      <text x="91" y="21" fill="#3d506b" fontSize="11" fontFamily="monospace">
+        src/utils/getUser.ts
+      </text>
+
+      {/* ── Line-number gutter ──────────────────────────── */}
+      <rect x="0" y={TOPBAR_H} width="62" height={EDITOR_H - TOPBAR_H} fill="#060e1a" />
+      {/* Old | new column divider */}
+      <line x1="30" y1={TOPBAR_H} x2="30" y2={EDITOR_H} stroke="#0d1a2e" strokeWidth="1" />
+      {/* Gutter | code divider */}
+      <line x1="62" y1={TOPBAR_H} x2="62" y2={EDITOR_H} stroke="#1a2845" strokeWidth="1" />
+
+      {/* ── Hunk header ─────────────────────────────────── */}
+      <rect x="0" y={lineY(0)} width="540" height={LINE_H} fill="rgba(99,102,241,0.07)" />
+      <text x="74" y={textY(0)} fill="#6366f1" fontSize="10.5"
+        fontFamily="monospace" opacity="0.55">
+        @@ -3,6 +3,6 @@ async function getUser
+      </text>
+
+      {/* ── Context line 1 ──────────────────────────────── */}
+      <text x="15" y={textY(1)} fill="#1e3050" fontSize="10.5"
+        fontFamily="monospace" textAnchor="middle">3</text>
+      <text x="47" y={textY(1)} fill="#1e3050" fontSize="10.5"
+        fontFamily="monospace" textAnchor="middle">3</text>
+      <text x="74" y={textY(1)} fill="#3d5268" fontSize="11" fontFamily="monospace">
+        {'  const user = await db.findOne(id)'}
+      </text>
+
+      {/* ── Context line 2 ──────────────────────────────── */}
+      <text x="15" y={textY(2)} fill="#1e3050" fontSize="10.5"
+        fontFamily="monospace" textAnchor="middle">4</text>
+      <text x="47" y={textY(2)} fill="#1e3050" fontSize="10.5"
+        fontFamily="monospace" textAnchor="middle">4</text>
+      <text x="74" y={textY(2)} fill="#3d5268" fontSize="11" fontFamily="monospace">
+        {'  if (!user) throw new NotFoundError()'}
+      </text>
+
+      {/* ── RED deleted line (the bug) ───────────────────── */}
+      <g ref={redRef}>
+        <rect x="0"  y={lineY(3)} width="540" height={LINE_H} fill="rgba(239,68,68,0.11)" />
+        <rect x="0"  y={lineY(3)} width="62"  height={LINE_H} fill="rgba(239,68,68,0.20)" />
+        {/* Old line number */}
+        <text x="15" y={textY(3)} fill="#ef4444" fontSize="10.5"
+          fontFamily="monospace" textAnchor="middle" opacity="0.6">5</text>
+        {/* Minus prefix */}
+        <text x="65" y={textY(3)} fill="#ef4444" fontSize="12"
+          fontFamily="monospace" textAnchor="end">−</text>
+        {/* Broken code */}
+        <text x="74" y={textY(3)} fill="#fca5a5" fontSize="11" fontFamily="monospace">
+          {'  return user.profile.email'}
+        </text>
+      </g>
+
+      {/* ── GREEN added line (the fix) ───────────────────── */}
+      <g ref={greenRef}>
+        <rect x="0"  y={lineY(4)} width="540" height={LINE_H} fill="rgba(16,185,129,0.09)" />
+        <rect x="0"  y={lineY(4)} width="62"  height={LINE_H} fill="rgba(16,185,129,0.17)" />
+        {/* New line number */}
+        <text x="47" y={textY(4)} fill="#10b981" fontSize="10.5"
+          fontFamily="monospace" textAnchor="middle" opacity="0.65">5</text>
+        {/* Plus prefix */}
+        <text x="65" y={textY(4)} fill="#10b981" fontSize="12"
+          fontFamily="monospace" textAnchor="end">+</text>
+        {/* Fixed code — revealed by clip rect animation */}
+        <g clipPath="url(#hfGreenReveal)">
+          <text x="74" y={textY(4)} fill="#6ee7b7" fontSize="11" fontFamily="monospace">
+            {'  return user.profile?.email ?? null'}
           </text>
         </g>
-      ))}
+      </g>
 
-      {/* Connector lines */}
-      {CONNECTORS.map((c, i) => (
-        <line
-          key={i}
-          className="flow-line"
-          x1={c.x1} y1={c.y}
-          x2={c.x2} y2={c.y}
-          stroke="#6366F1"
-          strokeOpacity="0.4"
-          strokeWidth="1.5"
-          strokeDasharray="5 5"
-        />
-      ))}
+      {/* ── Context line 3 ──────────────────────────────── */}
+      <text x="15" y={textY(5)} fill="#1e3050" fontSize="10.5"
+        fontFamily="monospace" textAnchor="middle">6</text>
+      <text x="47" y={textY(5)} fill="#1e3050" fontSize="10.5"
+        fontFamily="monospace" textAnchor="middle">6</text>
+      <text x="74" y={textY(5)} fill="#3d5268" fontSize="11" fontFamily="monospace">
+        {'  await db.close()'}
+      </text>
 
-      {/* Arrow heads */}
-      {CONNECTORS.map((c, i) => (
-        <polygon
-          key={i}
-          points={`${c.x2},${c.y - 4} ${c.x2 + 7},${c.y} ${c.x2},${c.y + 4}`}
-          fill="#6366F1"
-          opacity="0.5"
-        />
-      ))}
+      {/* ── Context line 4 (closing brace) ──────────────── */}
+      <text x="15" y={textY(6)} fill="#1e3050" fontSize="10.5"
+        fontFamily="monospace" textAnchor="middle">7</text>
+      <text x="47" y={textY(6)} fill="#1e3050" fontSize="10.5"
+        fontFamily="monospace" textAnchor="middle">7</text>
+      <text x="74" y={textY(6)} fill="#3d5268" fontSize="11" fontFamily="monospace">
+        {'}'}
+      </text>
 
-      {/* Moving dots */}
-      <circle ref={dot1} cx="145" cy="70" r="4" fill="#818CF8" filter="url(#glow-dot)" opacity="0" />
-      <circle ref={dot2} cx="335" cy="70" r="4" fill="#818CF8" filter="url(#glow-dot)" opacity="0" />
-      <circle ref={dot3} cx="525" cy="70" r="4" fill="#818CF8" filter="url(#glow-dot)" opacity="0" />
+      {/* ── PR Badge (slides up when fix is done) ────────── */}
+      <g ref={prBadgeRef}>
+        <rect x="283" y={EDITOR_H + 13} width="250" height="26"
+          rx="13" fill="#0b2318" stroke="#10b981" strokeWidth="1" />
+        <circle cx="305" cy={EDITOR_H + 26} r="5" fill="#10b981" />
+        <text x="316" y={EDITOR_H + 30} fill="#6ee7b7" fontSize="10.5"
+          fontFamily="Inter, sans-serif" fontWeight="600">
+          ✓  PR Opened — fix/null-profile-check
+        </text>
+      </g>
     </svg>
   )
 }
