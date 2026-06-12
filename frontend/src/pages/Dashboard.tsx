@@ -1,114 +1,287 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import Navbar from '../components/Navbar'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Plus, TrendingUp, Zap, CheckCircle, XCircle } from 'lucide-react'
+import AppShell from '../components/AppShell'
+import { Tabs, Skeleton, type TabItem } from '../components/ui'
 import TaskCard from '../components/TaskCard'
 import { getTasks, type StoredTask } from '../store/taskStore'
-import type { TaskStatus } from '../types/task'
+import { listTasks, getStats, type StatsResponse } from '../api/client'
+import { useAuth } from '../context/AuthContext'
+import type { TaskStatus, TaskRegistryEntry } from '../types/task'
+import { fadeUp, stagger } from '../lib/motion'
 
+/* ── Count-up hook ── */
+function useCountUp(target: number, duration = 600) {
+  const [value, setValue] = useState(0)
+  const rafRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const start = performance.now()
+    const from = 0
+    function tick(now: number) {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setValue(Math.round(from + (target - from) * eased))
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick)
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  }, [target, duration])
+
+  return value
+}
+
+/* ── Stat card ── */
+interface StatCardProps {
+  label: string
+  value: number
+  icon: React.ReactNode
+  color: string
+  bgColor: string
+  borderColor: string
+}
+
+function StatCard({ label, value, icon, color, bgColor, borderColor }: StatCardProps) {
+  const animated = useCountUp(value)
+  return (
+    <motion.div
+      variants={fadeUp}
+      className="bg-paper rounded-2xl border shadow-soft p-5 flex items-start gap-4"
+      style={{ borderColor }}
+      whileHover={{ y: -2, boxShadow: '0 8px 24px -4px rgba(15,23,42,0.12)' }}
+      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+    >
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: bgColor }}
+      >
+        <span style={{ color }}>{icon}</span>
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-ink tabular-nums">{animated}</p>
+        <p className="text-mute text-xs mt-0.5">{label}</p>
+      </div>
+    </motion.div>
+  )
+}
+
+/* ── Filter tabs ── */
 type Filter = 'all' | TaskStatus
 
-const FILTERS: { key: Filter; label: string }[] = [
+const FILTER_TABS: TabItem<Filter>[] = [
   { key: 'all',     label: 'All' },
   { key: 'running', label: 'Running' },
   { key: 'done',    label: 'Completed' },
   { key: 'failed',  label: 'Failed' },
+  { key: 'queued',  label: 'Queued' },
 ]
 
+/* ── Empty state ── */
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      {/* Empty terminal SVG */}
-      <svg width="72" height="56" viewBox="0 0 72 56" fill="none" className="mb-5 opacity-30">
-        <rect x="1" y="1" width="70" height="54" rx="8" stroke="#1E2D42" strokeWidth="2" />
-        <rect x="1" y="1" width="70" height="12" rx="8" fill="#0D1320" />
-        <circle cx="12" cy="7" r="2" fill="#EF4444" opacity="0.5" />
-        <circle cx="20" cy="7" r="2" fill="#F59E0B" opacity="0.5" />
-        <circle cx="28" cy="7" r="2" fill="#10B981" opacity="0.5" />
-        <line x1="12" y1="28" x2="28" y2="28" stroke="#1E2D42" strokeWidth="2" strokeLinecap="round" />
-        <line x1="12" y1="36" x2="40" y2="36" stroke="#1E2D42" strokeWidth="2" strokeLinecap="round" />
-        <line x1="12" y1="44" x2="22" y2="44" stroke="#1E2D42" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-      <p className="text-slate-400 font-medium mb-1">No tasks yet</p>
-      <p className="text-slate-600 text-sm mb-6">Submit a GitHub issue to get started.</p>
-      <Link to="/tasks/new" className="btn-primary">Submit first issue →</Link>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col items-center justify-center py-20 text-center"
+    >
+      <div className="w-16 h-16 rounded-2xl bg-primary-soft border border-primary/20 flex items-center justify-center mb-5">
+        <Zap className="w-7 h-7 text-primary" />
+      </div>
+      <h3 className="text-ink font-semibold text-lg mb-2">No tasks yet</h3>
+      <p className="text-mute text-sm mb-6 max-w-xs">
+        Submit a GitHub issue URL and Pullwright will plan, execute, and open a PR automatically.
+      </p>
+      <Link
+        to="/tasks/new"
+        className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl bg-primary text-white shadow-soft hover:bg-primary-dark transition-colors"
+      >
+        <Plus className="w-4 h-4" />
+        Submit first issue
+      </Link>
+    </motion.div>
   )
 }
 
+/* ── Main export ── */
 export default function Dashboard() {
-  const [filter,   setFilter]   = useState<Filter>('all')
+  const { user } = useAuth()
+  const [filter, setFilter] = useState<Filter>('all')
   const [allTasks, setAllTasks] = useState<StoredTask[]>([])
+  const [stats, setStats] = useState<StatsResponse | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  // Load from localStorage on mount; re-read when the user navigates back here.
+  const greeting = () => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Good morning'
+    if (h < 18) return 'Good afternoon'
+    return 'Good evening'
+  }
+
   useEffect(() => {
-    setAllTasks(getTasks())
+    function mergeTasks(local: StoredTask[], serverTasks: TaskRegistryEntry[]): StoredTask[] {
+      const merged = new Map<string, StoredTask>()
+      for (const t of local) merged.set(t.id, t)
+      for (const st of serverTasks) {
+        const existing = merged.get(st.taskId)
+        merged.set(st.taskId, {
+          id: st.taskId,
+          issueUrl: st.issueUrl,
+          issueTitle: st.issueTitle,
+          issueNumber: st.issueNumber,
+          repoName: st.issueUrl.replace('https://github.com/', '').split('/').slice(0, 2).join('/'),
+          branchName: `pullwright/task-${st.taskId}`,
+          status:
+            st.status === 'running' ? 'running'
+            : st.status === 'done' ? 'done'
+            : st.status === 'failed' ? 'failed'
+            : 'queued',
+          steps: existing?.steps ?? [],
+          createdAt: st.createdAt,
+          prUrl: st.prUrl,
+        })
+      }
+      return [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    }
+
+    async function refresh() {
+      const local = getTasks()
+      const [statsRes, tasksRes] = await Promise.allSettled([
+        getStats(),
+        listTasks(),
+      ])
+      if (statsRes.status === 'fulfilled' && statsRes.value) setStats(statsRes.value)
+      if (tasksRes.status === 'fulfilled' && tasksRes.value?.length) {
+        setAllTasks(mergeTasks(local, tasksRes.value))
+      } else {
+        setAllTasks(local)
+      }
+    }
+
+    let cancelled = false
+    refresh().finally(() => { if (!cancelled) setLoading(false) })
+
+    const interval = window.setInterval(() => {
+      refresh().catch(() => {})
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
   }, [])
 
-  const filtered = filter === 'all'
-    ? allTasks
-    : allTasks.filter(t => t.status === filter)
+  const filtered = filter === 'all' ? allTasks : allTasks.filter((t) => t.status === filter)
 
-  const stats = [
-    { label: 'Total',     value: allTasks.length,                                     color: 'text-slate-200' },
-    { label: 'Running',   value: allTasks.filter(t => t.status === 'running').length,  color: 'text-warning'   },
-    { label: 'Completed', value: allTasks.filter(t => t.status === 'done').length,     color: 'text-success'   },
-    { label: 'Failed',    value: allTasks.filter(t => t.status === 'failed').length,   color: 'text-danger'    },
+  // Derive stats from local data if backend didn't respond
+  const totalVal  = stats?.total   ?? allTasks.length
+  const runningVal= stats?.running ?? allTasks.filter((t) => t.status === 'running').length
+  const doneVal   = stats?.done    ?? allTasks.filter((t) => t.status === 'done').length
+  const failedVal = stats?.failed  ?? allTasks.filter((t) => t.status === 'failed').length
+
+  const statCards: StatCardProps[] = [
+    { label: 'Total Tasks', value: totalVal, icon: <TrendingUp className="w-5 h-5" />, color: '#1F2328', bgColor: '#F6F8FA', borderColor: '#D1D9E0' },
+    { label: 'Running', value: runningVal, icon: <Zap className="w-5 h-5" />, color: '#BF8700', bgColor: '#FFF8E6', borderColor: '#F0D78C' },
+    { label: 'Completed', value: doneVal, icon: <CheckCircle className="w-5 h-5" />, color: '#1A7F37', bgColor: '#EEF9F1', borderColor: '#A8E6BC' },
+    { label: 'Failed', value: failedVal, icon: <XCircle className="w-5 h-5" />, color: '#CF222E', bgColor: '#FFEBE9', borderColor: '#FFBBB5' },
   ]
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <main className="max-w-4xl mx-auto px-6 pt-24 pb-16">
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Tasks</h1>
-            <p className="text-slate-500 text-sm mt-0.5">All agent runs and their status</p>
-          </div>
-          <Link to="/tasks/new" className="btn-primary">+ New Task</Link>
+    <AppShell>
+      {/* Greeting */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="mb-8 flex items-center justify-between"
+      >
+        <div>
+          <h1 className="text-2xl font-bold text-ink">
+            {greeting()}{user?.name ?? user?.login ? `, ${user.name ?? user.login}` : ''} 👋
+          </h1>
+          <p className="text-mute text-sm mt-0.5">Here's everything your agent has been working on.</p>
         </div>
+        <Link
+          to="/tasks/new"
+          className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl bg-primary text-white shadow-soft hover:bg-primary-dark transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          New Task
+        </Link>
+      </motion.div>
 
-        {/* Stats strip */}
-        <div className="grid grid-cols-4 gap-3 mb-8">
-          {stats.map(s => (
-            <div key={s.label} className="bg-surface border border-subtle rounded-xl p-4">
-              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-              <p className="text-slate-500 text-xs mt-0.5">{s.label}</p>
-            </div>
+      {/* Stats strip */}
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-2xl" />
           ))}
         </div>
-
-        {/* Filter tabs */}
-        <div className="flex gap-1 mb-5 bg-surface border border-subtle rounded-lg p-1 w-fit">
-          {FILTERS.map(f => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-150
-                ${filter === f.key
-                  ? 'bg-elevated text-slate-100 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-300'}`}
-            >
-              {f.label}
-            </button>
+      ) : (
+        <motion.div
+          variants={stagger(0.07)}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8"
+        >
+          {statCards.map((s) => (
+            <StatCard key={s.label} {...s} />
           ))}
-        </div>
+        </motion.div>
+      )}
 
-        {/* Task list */}
-        {allTasks.length === 0 ? (
-          <EmptyState />
+      {/* Filter tabs */}
+      <div className="flex items-center gap-3 mb-5">
+        <Tabs
+          items={FILTER_TABS.map((f) => ({
+            ...f,
+            count: f.key === 'all' ? allTasks.length : allTasks.filter((t) => t.status === f.key).length,
+          }))}
+          value={filter}
+          onChange={setFilter}
+          layoutId="dashboard-tabs"
+        />
+      </div>
+
+      {/* Task list */}
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-20 rounded-xl mb-2.5" />
+            ))}
+          </motion.div>
+        ) : allTasks.length === 0 ? (
+          <EmptyState key="empty" />
         ) : filtered.length === 0 ? (
-          <p className="text-slate-500 text-sm py-12 text-center">
+          <motion.p
+            key="none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-mute text-sm py-12 text-center"
+          >
             No {filter} tasks.
-          </p>
+          </motion.p>
         ) : (
-          <div className="flex flex-col gap-2.5">
-            {filtered.map(task => <TaskCard key={task.id} task={task} />)}
-          </div>
+          <motion.div
+            key="list"
+            variants={stagger(0.05)}
+            initial="hidden"
+            animate="show"
+            className="flex flex-col gap-2.5"
+          >
+            {filtered.map((task) => (
+              <motion.div key={task.id} variants={fadeUp}>
+                <TaskCard task={task} />
+              </motion.div>
+            ))}
+          </motion.div>
         )}
-
-      </main>
-    </div>
+      </AnimatePresence>
+    </AppShell>
   )
 }
