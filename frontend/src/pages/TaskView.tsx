@@ -1,64 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowLeft, Copy, ExternalLink, RotateCcw } from 'lucide-react'
+import AppShell from '../components/AppShell'
 import StepList from '../components/StepList'
 import LiveLog from '../components/LiveLog'
+import MetricsPanel from '../components/MetricsPanel'
 import { useTaskStream } from '../hooks/useTaskStream'
 import { getTask, updateTask } from '../store/taskStore'
+import { retryTask } from '../api/client'
+import { Badge, Button, useToast } from '../components/ui'
+import { cn } from '../lib/cn'
 
-/* ─────────────────────────────────────────────────────────────────
-   Light Navbar  (same design language as Home page)
-───────────────────────────────────────────────────────────────── */
-function LightNavbar() {
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/85 backdrop-blur-md border-b border-gray-100/80">
-      <div className="max-w-[1220px] mx-auto px-6 h-14 flex items-center justify-between">
-        {/* Brand */}
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
-            <line x1="14" y1="5"  x2="5"  y2="21" stroke="#1e293b" strokeWidth="1.5" strokeLinecap="round" opacity="0.45"/>
-            <line x1="14" y1="5"  x2="23" y2="21" stroke="#1e293b" strokeWidth="1.5" strokeLinecap="round" opacity="0.45"/>
-            <line x1="5"  y1="21" x2="23" y2="21" stroke="#1e293b" strokeWidth="1.5" strokeLinecap="round" opacity="0.25"/>
-            <circle cx="5"  cy="21" r="2.5" fill="white" stroke="#1e293b" strokeWidth="1.5"/>
-            <circle cx="23" cy="21" r="2.5" fill="white" stroke="#1e293b" strokeWidth="1.5"/>
-            <circle cx="14" cy="5"  r="4"   fill="#1e293b"/>
-            <circle cx="14" cy="5"  r="2"   fill="white" opacity="0.9"/>
-          </svg>
-          <span className="text-gray-900 font-bold text-base tracking-tight">devin</span>
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500
-                           border border-gray-200 uppercase tracking-widest">
-            agent
-          </span>
-        </Link>
-
-        {/* Nav right */}
-        <div className="flex items-center gap-2">
-          <Link to="/dashboard"
-            className="text-gray-600 hover:text-gray-900 text-sm font-medium px-4 py-2 transition-colors rounded-lg">
-            Dashboard
-          </Link>
-          <Link to="/tasks/new"
-            className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full
-                       bg-gray-900 text-white shadow-sm hover:bg-gray-700 transition-all duration-200">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <line x1="6" y1="1" x2="6" y2="11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-              <line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-            </svg>
-            New Task
-          </Link>
-        </div>
-      </div>
-    </nav>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   Elapsed timer
-───────────────────────────────────────────────────────────────── */
 function useElapsedTimer(running: boolean) {
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
     if (!running) return
-    const id = setInterval(() => setElapsed(s => s + 1), 1000)
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000)
     return () => clearInterval(id)
   }, [running])
   const m = Math.floor(elapsed / 60)
@@ -66,213 +24,236 @@ function useElapsedTimer(running: boolean) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   Main page
-───────────────────────────────────────────────────────────────── */
+function StatusBadge({ status, elapsed }: { status: string; elapsed: string }) {
+  if (status === 'done') {
+    return <Badge tone="success" dot>Done</Badge>
+  }
+  if (status === 'failed') {
+    return <Badge tone="danger" dot>Failed</Badge>
+  }
+  return (
+    <Badge tone="warning" dot className="tabular-nums">
+      Running · {elapsed}
+    </Badge>
+  )
+}
+
+function CopyBranchButton({ branch }: { branch: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = useCallback(async () => {
+    await navigator.clipboard.writeText(branch)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }, [branch])
+
+  return (
+    <button
+      onClick={copy}
+      className="text-faint hover:text-ink transition-colors p-0.5"
+      title="Copy branch name"
+      type="button"
+    >
+      <AnimatePresence mode="wait">
+        {copied ? (
+          <motion.span key="check" initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} className="text-success text-[10px] font-medium">
+            ✓
+          </motion.span>
+        ) : (
+          <motion.span key="copy" initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }}>
+            <Copy className="w-3 h-3" />
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  )
+}
+
 export default function TaskView() {
-  const { id }   = useParams<{ id: string }>()
-  const taskId   = id ?? ''
+  const { id } = useParams<{ id: string }>()
+  const taskId = id ?? ''
+  const { push: pushToast } = useToast()
 
   const [task, setTask] = useState(() => getTask(taskId))
-  const { events, steps, isRunning } = useTaskStream(taskId)
+  const { events, steps, isRunning, metrics, failedReason, reconnect } = useTaskStream(taskId)
   const elapsed = useElapsedTimer(isRunning)
+  const [retrying, setRetrying] = useState(false)
+  const [highlightedStepId, setHighlightedStepId] = useState<number | null>(null)
+  const stepGroupRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 
-  // Re-read store on status change
   useEffect(() => { setTask(getTask(taskId)) }, [taskId, isRunning])
 
-  // Persist live steps to localStorage → Dashboard stays in sync
   useEffect(() => {
     if (steps.length > 0) {
       updateTask(taskId, { steps })
-      setTask(prev => prev ? { ...prev, steps } : prev)
+      setTask((prev) => (prev ? { ...prev, steps } : prev))
     }
   }, [steps, taskId])
 
-  // Derived values
-  const issueTitle  = task?.issueTitle  ?? `Task ${taskId.slice(0, 8)}`
+  const issueTitle = task?.issueTitle ?? `Task ${taskId.slice(0, 8)}`
   const issueNumber = task?.issueNumber ?? 0
-  const branchName  = task?.branchName  ?? `devin/task-${taskId}`
-  const repoName    = task?.repoName    ?? ''
-  const prUrl       = task?.prUrl
-  const status      = isRunning ? 'running' : (task?.status ?? 'running')
-  const isDone      = status === 'done'
-  const isFailed    = status === 'failed'
+  const branchName = task?.branchName ?? `pullwright/task-${taskId}`
+  const repoName = task?.repoName ?? ''
+  const prUrl = task?.prUrl
+  const status = failedReason ? 'failed' : isRunning ? 'running' : (task?.status ?? 'running')
+  const isDone = status === 'done'
 
-  // Truncate long branch name: "devin/task-8323cae7…7ff56ab"
-  const shortBranch = branchName.length > 44
-    ? branchName.slice(0, 34) + '…' + branchName.slice(-8)
-    : branchName
+  const shortBranch =
+    branchName.length > 40 ? branchName.slice(0, 30) + '…' + branchName.slice(-8) : branchName
 
-  /* ── Not found ── */
+  async function handleRetry() {
+    setRetrying(true)
+    try {
+      await retryTask(taskId, task?.issueUrl)
+      updateTask(taskId, { status: 'running', prUrl: undefined })
+      setTask((prev) => (prev ? { ...prev, status: 'running', prUrl: undefined } : prev))
+      reconnect()
+      pushToast('Task queued for retry', 'success')
+    } catch {
+      pushToast('Retry failed — check backend is running', 'error')
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  const handleStepClick = useCallback((stepId: number) => {
+    setHighlightedStepId(stepId)
+    const el = stepGroupRefs.current.get(stepId)
+    if (!el) return
+    const motionPref = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: motionPref ? 'auto' : 'smooth', block: 'start' })
+  }, [])
+
   if (!task) {
     return (
-      <div
-        className="min-h-screen font-sans antialiased"
-        style={{
-          background: '#F7F8FC',
-          backgroundImage:
-            'linear-gradient(rgba(203,213,225,0.3) 1px,transparent 1px),' +
-            'linear-gradient(90deg,rgba(203,213,225,0.3) 1px,transparent 1px)',
-          backgroundSize: '32px 32px',
-        }}
-      >
-        <LightNavbar />
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <p className="text-gray-500 mb-4">Task not found.</p>
-            <Link to="/dashboard" className="text-indigo-600 text-sm hover:underline">
-              ← Back to dashboard
-            </Link>
-          </div>
+      <AppShell maxWidth="max-w-6xl">
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <p className="text-mute mb-3">Task not found.</p>
+          <Link to="/dashboard" className="text-sm text-accent hover:underline">
+            ← Back to dashboard
+          </Link>
         </div>
-      </div>
+      </AppShell>
     )
   }
 
   return (
-    <div
-      className="min-h-screen font-sans antialiased"
-      style={{
-        background: '#F7F8FC',
-        backgroundImage:
-          'linear-gradient(rgba(203,213,225,0.3) 1px,transparent 1px),' +
-          'linear-gradient(90deg,rgba(203,213,225,0.3) 1px,transparent 1px)',
-        backgroundSize: '32px 32px',
-      }}
-    >
-      <LightNavbar />
-
-      <main className="max-w-[1220px] mx-auto px-5 pt-[72px] pb-6" style={{ minHeight: '100vh' }}>
-        {/* ── Outer padding wrapper ── */}
-        <div className="pt-4 pb-4">
-
-          {/* ── Main white card ── */}
-          <div
-            className="bg-white rounded-2xl overflow-hidden flex flex-col"
-            style={{
-              boxShadow:
-                '0 4px 6px -1px rgba(0,0,0,0.04),' +
-                '0 10px 40px -8px rgba(15,23,42,0.10),' +
-                '0 1px 3px rgba(0,0,0,0.03)',
-              border: '1px solid rgba(226,232,240,0.9)',
-              height: 'calc(100vh - 108px)',
-            }}
-          >
-            {/* ── Card header ── */}
-            <div className="shrink-0 px-5 pt-4 pb-3.5 border-b border-gray-100">
-              {/* Row 1: breadcrumb + status */}
-              <div className="flex items-center justify-between mb-3 gap-3">
-                {/* Nav arrows + branch breadcrumb */}
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <Link to="/dashboard"
-                    className="w-7 h-7 rounded-md bg-gray-50 hover:bg-gray-100 border border-gray-200
-                               flex items-center justify-center text-gray-500 transition-all shrink-0">
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M7 2L4 5.5L7 9" stroke="currentColor" strokeWidth="1.5"
-                        strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </Link>
-                  {/* Fwd arrow (decorative) */}
-                  <button disabled
-                    className="w-7 h-7 rounded-md bg-gray-50 border border-gray-200
-                               flex items-center justify-center text-gray-300 cursor-default shrink-0">
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M4 2L7 5.5L4 9" stroke="currentColor" strokeWidth="1.5"
-                        strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
-                  {/* Branch pill */}
-                  <span className="font-mono text-xs text-gray-700 bg-gray-100 border border-gray-200
-                                   px-3 py-1.5 rounded-lg truncate max-w-xs sm:max-w-sm">
-                    {shortBranch}
-                  </span>
-                </div>
-
-                {/* Status badge */}
-                {isDone ? (
-                  <div className="flex items-center gap-1.5 bg-green-50 border border-green-200
-                                  text-green-700 text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0">
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M2 5.5L4.5 8L9 3" stroke="currentColor" strokeWidth="1.7"
-                        strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Done
-                  </div>
-                ) : isFailed ? (
-                  <div className="flex items-center gap-1.5 bg-red-50 border border-red-200
-                                  text-red-700 text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0">
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M2.5 2.5L8.5 8.5M8.5 2.5L2.5 8.5" stroke="currentColor"
-                        strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                    Failed
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200
-                                  text-amber-700 text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                    Running · {elapsed}
-                  </div>
-                )}
-              </div>
-
-              {/* Row 2: project + issue title */}
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0">
-                  {repoName && (
-                    <p className="text-gray-500 text-sm mb-0.5 truncate">{repoName}</p>
-                  )}
-                  <h1 className="text-gray-900 font-bold text-xl leading-tight truncate">
-                    {issueNumber > 0 ? `#${issueNumber} — ` : ''}{issueTitle}
-                  </h1>
-                </div>
-
-                {prUrl && (
-                  <a href={prUrl} target="_blank" rel="noreferrer"
-                    className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600
-                               bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg
-                               hover:bg-indigo-100 transition-colors shrink-0">
-                    View PR
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M2 9L9 2M9 2H4.5M9 2V6.5" stroke="currentColor"
-                        strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </a>
-                )}
+    <AppShell maxWidth="max-w-[1240px]">
+      <div
+        className={cn(
+          'rounded-xl border border-line bg-paper overflow-hidden flex flex-col',
+          'shadow-soft',
+          'h-[calc(100vh-7rem)] min-h-[520px]',
+        )}
+      >
+        {/* Header */}
+        <div className="shrink-0 px-4 sm:px-5 py-4 border-b border-line bg-canvas/30">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Link
+                to="/dashboard"
+                className="w-8 h-8 rounded-lg border border-line bg-paper hover:bg-canvas flex items-center justify-center text-mute transition-colors shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+              <div className="flex items-center gap-1.5 font-mono text-xs text-ink bg-paper border border-line px-2.5 py-1.5 rounded-lg min-w-0">
+                <span className="truncate">{shortBranch}</span>
+                <CopyBranchButton branch={branchName} />
               </div>
             </div>
-
-            {/* ── Card body: Plan | Terminal ── */}
-            <div className="flex flex-1 min-h-0">
-
-              {/* Left — Plan */}
-              <div className="w-[260px] shrink-0 border-r border-gray-100 bg-gray-50/50 flex flex-col">
-                {/* Plan header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
-                  <span className="text-gray-800 font-semibold text-sm">Plan</span>
-                  <span className="text-gray-400 text-xs tabular-nums">{steps.length} steps</span>
-                </div>
-                {/* Step list */}
-                <div className="flex-1 overflow-y-auto py-2.5 px-2.5">
-                  {steps.length === 0 ? (
-                    <p className="text-gray-400 text-xs text-center pt-8 px-2">
-                      {isRunning ? 'Waiting for planner…' : 'No steps recorded.'}
-                    </p>
-                  ) : (
-                    <StepList steps={steps} />
-                  )}
-                </div>
-              </div>
-
-              {/* Right — Terminal / live log */}
-              <div className="flex-1 min-w-0 overflow-hidden">
-                <LiveLog events={events} isRunning={isRunning} />
-              </div>
-            </div>
+            <StatusBadge status={status} elapsed={elapsed} />
           </div>
 
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              {repoName && <p className="text-xs text-mute mb-0.5 truncate">{repoName}</p>}
+              <h1 className="text-lg sm:text-xl font-bold text-ink leading-snug truncate">
+                {issueNumber > 0 ? `#${issueNumber} — ` : ''}
+                {issueTitle}
+              </h1>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {(prUrl ?? (isDone && task.prUrl)) && (
+                <a
+                  href={prUrl ?? task.prUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-dark bg-primary-soft border border-primary/20 px-3 py-1.5 rounded-lg hover:bg-primary-soft/80 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  View PR
+                </a>
+              )}
+              {status === 'failed' && !isRunning && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  className="rounded-lg gap-1.5"
+                >
+                  <RotateCcw className={cn('w-3.5 h-3.5', retrying && 'animate-spin')} />
+                  {retrying ? 'Queuing…' : 'Retry'}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
-      </main>
-    </div>
+
+        {/* Body */}
+        <div className="flex flex-1 min-h-0">
+          <aside className="w-[220px] sm:w-[240px] shrink-0 border-r border-line bg-canvas/20 flex flex-col hidden sm:flex">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-line shrink-0">
+              <span className="text-sm font-semibold text-ink">Plan</span>
+              <span className="text-xs text-faint tabular-nums">{steps.length} steps</span>
+            </div>
+            <div className="flex-1 overflow-y-auto py-2 px-2">
+              {steps.length === 0 ? (
+                <p className="text-faint text-xs text-center pt-6 px-2">
+                  {isRunning ? 'Waiting for planner…' : 'No steps recorded.'}
+                </p>
+              ) : (
+                <StepList
+                  steps={steps}
+                  onStepClick={handleStepClick}
+                  highlightedStepId={highlightedStepId}
+                />
+              )}
+            </div>
+          </aside>
+
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+            <div className="shrink-0 px-4 pt-3 pb-2 border-b border-line/60">
+              <MetricsPanel metrics={metrics} isRunning={isRunning} />
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <LiveLog
+                events={events}
+                isRunning={isRunning}
+                failedReason={failedReason}
+                registerRef={(stepId, el) => {
+                  if (el) stepGroupRefs.current.set(stepId, el)
+                  else stepGroupRefs.current.delete(stepId)
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Done footer */}
+        {isDone && prUrl && (
+          <div className="shrink-0 px-4 py-2.5 border-t border-line bg-primary-soft/30 flex items-center justify-between gap-3">
+            <p className="text-xs font-medium text-primary-dark">Task complete — PR opened</p>
+            <a
+              href={prUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-primary-dark hover:underline inline-flex items-center gap-1"
+            >
+              View PR <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        )}
+      </div>
+    </AppShell>
   )
 }
