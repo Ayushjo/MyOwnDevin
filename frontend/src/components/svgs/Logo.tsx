@@ -1,17 +1,68 @@
-// Three-node agent graph — represents the AI agent network
-export default function Logo({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
-      {/* Connecting edges */}
-      <line x1="14" y1="5" x2="5"  y2="21" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
-      <line x1="14" y1="5" x2="23" y2="21" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
-      <line x1="5"  y1="21" x2="23" y2="21" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-      {/* Outer nodes */}
-      <circle cx="5"  cy="21" r="2.5" fill="#162032" stroke="#6366F1" strokeWidth="1.5" />
-      <circle cx="23" cy="21" r="2.5" fill="#162032" stroke="#6366F1" strokeWidth="1.5" />
-      {/* Center / primary node */}
-      <circle cx="14" cy="5" r="4" fill="#6366F1" />
-      <circle cx="14" cy="5" r="2" fill="white" opacity="0.9" />
-    </svg>
+import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { cn } from '../../lib/cn'
+import { PullwrightIcon, PullwrightLockup } from './PullwrightMark'
+
+type LogoProps = {
+  height?: number
+  className?: string
+  linked?: boolean
+  variant?: 'default' | 'inverse'
+  animated?: boolean
+}
+
+export default function Logo({
+  height = 32,
+  className = '',
+  linked = true,
+  variant = 'default',
+  animated = true,
+}: LogoProps) {
+  const textClassName = variant === 'inverse' ? 'fill-white' : 'fill-ink'
+  const lockup = (
+    <PullwrightLockup
+      height={height}
+      className={className}
+      textClassName={textClassName}
+      animated={animated}
+    />
   )
+
+  const inner = animated ? (
+    <motion.span
+      className="inline-flex group"
+      whileHover={{ scale: 1.015 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+    >
+      {lockup}
+    </motion.span>
+  ) : (
+    <span className="inline-flex">{lockup}</span>
+  )
+
+  if (!linked) {
+    return <span className={cn('inline-flex shrink-0 group', animated && 'cursor-default')}>{inner}</span>
+  }
+
+  return (
+    <Link
+      to="/"
+      className={cn('inline-flex shrink-0 group', className)}
+      aria-label="Pullwright home"
+    >
+      {inner}
+    </Link>
+  )
+}
+
+export function LogoIcon({
+  size = 28,
+  className = '',
+  animated = false,
+}: {
+  size?: number
+  className?: string
+  animated?: boolean
+}) {
+  return <PullwrightIcon size={size} className={className} animated={animated} />
 }
