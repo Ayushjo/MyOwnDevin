@@ -1,3 +1,11 @@
 .env
 node_modules/
 dist/
+.DS_Store
+backend/app.log
+backend/tsconfig.tsbuildinfo
+backend/benchmarks/runs/
+backend/benchmarks/runBenchmark.js
+backend/benchmarks/runBenchmark.js.map
+backend/benchmarks/runBenchmark.d.ts
+backend/benchmarks/runBenchmark.d.ts.map
