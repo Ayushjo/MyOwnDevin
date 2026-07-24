@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { TaskEvent } from '../types/task'
 
 /* ─────────────────────────────────────────────────────────────────
@@ -6,10 +6,21 @@ import type { TaskEvent } from '../types/task'
 ───────────────────────────────────────────────────────────────── */
 type ToolEntry = { tool: string; args: Record<string, unknown> }
 
+type ThoughtEntry = {
+  agent: string
+  status: 'thinking' | 'reasoning'
+  text: string
+  model?: string
+  provider?: string
+}
+
 type LogGroup = {
-  stepId:      number
+  kind:        'step' | 'phase'
+  stepId:      number   // real step id when kind === 'step'; sequence index otherwise
   description: string
   tools:       ToolEntry[]
+  thoughts:    ThoughtEntry[]
+  activeThinking?: string
   output?:     string
   done:        boolean
 }
@@ -30,10 +41,27 @@ function deriveGroups(events: TaskEvent[]): Derived {
     switch (ev.type) {
       case 'step_start':
         if (cur) groups.push(cur)
-        cur = { stepId: ev.step.id, description: ev.step.description, tools: [], done: false }
+        cur = { kind: 'step', stepId: ev.step.id, description: ev.step.title ?? ev.step.description, tools: [], thoughts: [], done: false }
         break
       case 'tool_call':
-        cur?.tools.push({ tool: ev.tool, args: ev.args })
+        if (cur) {
+          const last = cur.tools[cur.tools.length - 1]
+          const dup = last &&
+            last.tool === ev.tool &&
+            JSON.stringify(last.args) === JSON.stringify(ev.args)
+          if (!dup) cur.tools.push({ tool: ev.tool, args: ev.args })
+        }
+        break
+      case 'agent_thought':
+        if (!cur) {
+          cur = { kind: 'phase', stepId: groups.length + 1, description: `${ev.agent} agent`, tools: [], thoughts: [], done: false }
+        }
+        if (ev.status === 'thinking') {
+          cur.activeThinking = ev.text
+        } else {
+          cur.thoughts.push({ agent: ev.agent, status: ev.status, text: ev.text, model: ev.model, provider: ev.provider })
+          cur.activeThinking = undefined
+        }
         break
       case 'step_done':
         if (cur) { cur.output = ev.result.output; cur.done = true }
@@ -45,6 +73,14 @@ function deriveGroups(events: TaskEvent[]): Derived {
       case 'task_failed':
         if (cur) { groups.push(cur); cur = null }
         failed = ev.reason
+        break
+      case 'phase_start':
+        if (!cur) {
+          cur = { kind: 'phase', stepId: groups.length + 1, description: `Phase: ${ev.phase}`, tools: [], thoughts: [], done: false }
+        }
+        break
+      case 'phase_end':
+        if (cur && !cur.done) { cur.done = true }
         break
     }
   }
@@ -137,6 +173,51 @@ function FileView({ filePath, content }: { filePath: string; content: string }) 
 }
 
 /* ─────────────────────────────────────────────────────────────────
+   LLM thinking / reasoning blocks
+───────────────────────────────────────────────────────────────── */
+function ThinkingBlock({ thought }: { thought: ThoughtEntry }) {
+  const [open, setOpen] = useState(thought.status === 'reasoning')
+
+  if (thought.status === 'thinking') {
+    return (
+      <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-violet-50 border border-violet-100">
+        <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse shrink-0" />
+        <span className="text-violet-700 text-[11px] font-medium">{thought.text}</span>
+      </div>
+    )
+  }
+
+  const preview = thought.text.slice(0, 120)
+  const hasMore = thought.text.length > 120
+
+  return (
+    <div className="mt-2 rounded-lg border border-violet-100 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 bg-violet-50 hover:bg-violet-100/70 transition-colors text-left"
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-violet-500 shrink-0">
+          <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2" />
+          <path d="M4 6h4M6 4v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+        <span className="text-violet-700 text-[11px] font-semibold capitalize">{thought.agent} reasoning</span>
+        {thought.model && (
+          <span className="text-violet-400 text-[10px] font-mono ml-auto">{thought.provider}/{thought.model}</span>
+        )}
+      </button>
+      {open ? (
+        <div className="px-3 py-2 bg-white text-[11px] text-gray-600 leading-relaxed whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
+          {thought.text}
+        </div>
+      ) : hasMore ? (
+        <div className="px-3 py-1.5 bg-white text-[10.5px] text-gray-400 truncate">{preview}…</div>
+      ) : null}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────
    Single tool call line
 ───────────────────────────────────────────────────────────────── */
 function ToolLine({ entry }: { entry: ToolEntry }) {
@@ -170,40 +251,61 @@ function ToolLine({ entry }: { entry: ToolEntry }) {
 /* ─────────────────────────────────────────────────────────────────
    Single step group
 ───────────────────────────────────────────────────────────────── */
-function StepGroup({ group, isLast }: { group: LogGroup; isLast: boolean }) {
+function StepGroup({ group, isLast, registerRef }: { group: LogGroup; isLast: boolean; registerRef?: (stepId: number, el: HTMLDivElement | null) => void }) {
   const primaryTool = group.tools.find(t => t.tool !== 'run_shell')?.tool ?? group.tools[0]?.tool
 
+  const isStep = group.kind === 'step'
+
   return (
-    <div className="flex gap-4">
+    <div
+      className="flex gap-4"
+      ref={el => { if (isStep) registerRef?.(group.stepId, el) }}
+    >
       {/* Left: circle + connector line */}
       <div className="flex flex-col items-center shrink-0 pt-0.5">
-        <div
-          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-          style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)', boxShadow: '0 2px 8px rgba(99,102,241,0.35)' }}
-        >
-          {group.stepId}
-        </div>
+        {isStep ? (
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+            style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)', boxShadow: '0 2px 8px rgba(99,102,241,0.35)' }}
+          >
+            {group.stepId}
+          </div>
+        ) : (
+          <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-gray-100 border border-gray-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+          </div>
+        )}
         {!isLast && <div className="w-px flex-1 bg-gray-200 mt-1.5 min-h-[20px]" />}
       </div>
 
       {/* Right: content */}
       <div className="flex-1 min-w-0 pb-6">
-        {/* LOG EXECUTION header */}
+        {/* LOG header */}
         <div className="flex items-center justify-between mb-1.5">
           <span className="font-mono text-[10px] text-gray-400 uppercase tracking-wider">
-            LOG EXECUTION | STEP {group.stepId}
+            {isStep ? `LOG EXECUTION | STEP ${group.stepId}` : group.description}
           </span>
           {primaryTool && <ToolIcon tool={primaryTool} />}
         </div>
 
-        {/* ✓ Step description */}
-        <div className="flex items-start gap-1.5 mb-1">
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" className="shrink-0 mt-[3px] text-gray-800">
-            <path d="M2 5.5L4.5 8L9 3" stroke="currentColor" strokeWidth="1.6"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="text-gray-900 text-[13px] font-semibold leading-snug">{group.description}</span>
-        </div>
+        {/* ✓ Step description (only for real steps — phases show it in the header) */}
+        {isStep && (
+          <div className="flex items-start gap-1.5 mb-1">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" className="shrink-0 mt-[3px] text-gray-800">
+              <path d="M2 5.5L4.5 8L9 3" stroke="currentColor" strokeWidth="1.6"
+                strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-gray-900 text-[13px] font-semibold leading-snug">{group.description}</span>
+          </div>
+        )}
+
+        {/* LLM thinking / reasoning */}
+        {group.activeThinking && (
+          <ThinkingBlock thought={{ agent: 'agent', status: 'thinking', text: group.activeThinking }} />
+        )}
+        {group.thoughts.map((t, i) => (
+          <ThinkingBlock key={i} thought={t} />
+        ))}
 
         {/* Tool calls */}
         {group.tools.map((t, i) => <ToolLine key={i} entry={t} />)}
@@ -222,7 +324,7 @@ function StepGroup({ group, isLast }: { group: LogGroup; isLast: boolean }) {
         )}
 
         {/* In-progress indicator */}
-        {!group.done && (
+        {!group.done && !group.activeThinking && (
           <div className="flex items-center gap-1.5 mt-2">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
             <span className="text-indigo-500 text-[11px]">Processing…</span>
@@ -236,9 +338,10 @@ function StepGroup({ group, isLast }: { group: LogGroup; isLast: boolean }) {
 /* ─────────────────────────────────────────────────────────────────
    Main export
 ───────────────────────────────────────────────────────────────── */
-export default function LiveLog({ events, isRunning }: { events: TaskEvent[]; isRunning: boolean }) {
+export default function LiveLog({ events, isRunning, failedReason, registerRef }: { events: TaskEvent[]; isRunning: boolean; failedReason?: string; registerRef?: (stepId: number, el: HTMLDivElement | null) => void }) {
   const bottomRef = useRef<HTMLDivElement>(null)
-  const { groups, complete, failed } = deriveGroups(events)
+  const { groups, complete, failed: eventFailed } = deriveGroups(events)
+  const failed = eventFailed ?? failedReason
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -266,7 +369,12 @@ export default function LiveLog({ events, isRunning }: { events: TaskEvent[]; is
         )}
 
         {groups.map((g, i) => (
-          <StepGroup key={g.stepId} group={g} isLast={i === groups.length - 1 && !complete && !failed} />
+          <StepGroup
+            key={`${g.kind}-${g.stepId}-${i}`}
+            group={g}
+            isLast={i === groups.length - 1 && !complete && !failed}
+            registerRef={registerRef}
+          />
         ))}
 
         {/* ── Task complete banner ── */}
