@@ -1,226 +1,389 @@
-import logger from "../logger.js";
-import type ToolExecutor from "../tools/index.js";
-import { Anthropic } from "@anthropic-ai/sdk";
-import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages/messages.js";
-export const TOOLS = [
-    {
-      name: "run_shell",
-      description: "Run any shell command inside the sandbox. Use for installing dependencies, running tests, compiling code, or any terminal operation.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          command: {
-            type: "string",
-            description: "Shell command to run e.g. 'npm install', 'tsc', 'node index.js'"
-          },
-          timeoutMs: {
-            type: "number",
-            description: "How long to wait before killing the command. Defaults to 30000ms"
-          }
-        },
-        required: ["command"]
-      }
-    },
-    {
-      name: "read_file",
-      description: "Read the contents of a file inside the sandbox. Use to inspect existing code before making changes.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          filePath: {
-            type: "string",
-            description: "Absolute path to the file e.g. '/workspace/src/index.ts'"
-          },
-          timeoutMs: {
-            type: "number",
-            description: "How long to wait before killing the command. Defaults to 30000ms"
-          }
-        },
-        required: ["filePath"]
-      }
-    },
-    {
-      name: "write_file",
-      description: "Write content to a file inside the sandbox. Use to create new files or overwrite existing ones with fixes.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          filePath: {
-            type: "string",
-            description: "Absolute path to the file e.g. '/workspace/src/index.ts'"
-          },
-          content: {
-            type: "string",
-            description: "Full content to write to the file"
-          } ,
-          timeoutMs: {
-            type: "number",
-            description: "How long to wait before killing the command. Defaults to 30000ms"
-          }
-        },
-        required: ["filePath", "content"]
-      }
-    },
-    {
-      name: "git_commit",
-      description: "Stage all changes and commit them. Use after writing files to save progress.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          message: {
-            type: "string",
-            description: "Commit message describing what was changed e.g. 'fix: handle null case in getUserById'"
-          } ,
-          timeoutMs: {
-            type: "number",
-            description: "How long to wait before killing the command. Defaults to 30000ms"
-          }
-        },
-        required: ["message"]
-      }
-    },
-    {
-      name: "git_checkout",
-      description: "Create and switch to a new branch inside the sandbox.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          branch: {
-            type: "string",
-            description: "Branch name to create and switch to e.g. 'fix/issue-23'"
-          } ,
-          timeoutMs: {
-            type: "number",
-            description: "How long to wait before killing the command. Defaults to 30000ms"
-          }
-        },
-        required: ["branch"]
-      }
-    }
-  ]
-  type ToolResult = {
-    success: boolean;
-    output: string;
-    error? : string
+import logger from "../logger.js"
+import type ToolExecutor from "../tools/index.js"
+import { AGENT_TOOLS } from "./tools.js"
+import type { ToolInput } from "./tools.js"
+import type { LLMRouter } from "../llm/router.js"
+import type {
+  AgentRole,
+  LLMMessage,
+  LLMMessageContent,
+  RunResult,
+  ToolEventCallback,
+  ThoughtCallback,
+  Usage,
+} from "../llm/types.js"
+import { isAgentRecoverableError, isOutputParseFailed } from "../llm/errors.js"
+import { buildAgentRecoveryPrompt } from "./recovery.js"
+
+type ToolResult = {
+  success: boolean
+  output: string
+  error?: string
 }
-  type Message = {
-    role: "user" | "assistant"
-    content: string | ContentBlock[]
+
+export type AgentBrainOptions = {
+  systemPrompt: string
+  role: AgentRole
+  router: LLMRouter
+  toolExecutor?: ToolExecutor
+  onToolEvent?: ToolEventCallback
+  onThought?: ThoughtCallback
+  stepId?: number | undefined
+}
+
+const EXPLORE_TOOLS = new Set([
+  "search_code", "list_dir", "view_file", "read_file", "print_tree",
+])
+
+const MAX_RECOVERABLE_ERRORS = Number(process.env.AGENT_MAX_RECOVERABLE_ERRORS ?? 3)
+
+function isToolValidationError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const msg = error.message.toLowerCase()
+  return msg.includes("tool call validation") || msg.includes("tool_use_failed")
+}
+
+const MAX_TOOL_RESULT_CHARS = Number(process.env.MAX_TOOL_RESULT_CHARS ?? 8000)
+const HISTORY_WINDOW_ROUNDS = Number(process.env.AGENT_HISTORY_WINDOW ?? 6)
+
+function capToolContent(content: string): string {
+  if (content.length <= MAX_TOOL_RESULT_CHARS) return content
+  return content.slice(0, MAX_TOOL_RESULT_CHARS) + `\n… [truncated ${content.length - MAX_TOOL_RESULT_CHARS} chars]`
+}
+
+/** Map hallucinated / legacy tool names to canonical handlers. */
+function canonicalToolName(name: string): string {
+  const aliases: Record<string, string> = {
+    "repo_browser.search": "search_code",
+    "repo_browser_search": "search_code",
+    "repo_browser.print_tree": "print_tree",
+    "repo_browser_print_tree": "print_tree",
+    "repo_browser.list_dir": "list_dir",
+    "repo_browser_list_dir": "list_dir",
+  }
+  return aliases[name] ?? name
+}
+
+export class AgentBrain {
+  private history: LLMMessage[] = []
+  private historyDigest = ""
+  private totalUsage: Usage = { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+  private llmCalls = 0
+  private exploreOnlyRounds = 0
+  private toolInvocations = 0
+  private wroteFile = false
+  private recoverableErrors = 0
+  private lastToolAttempted = ""
+
+  constructor(private opts: AgentBrainOptions) {}
+
+  async run(userMessage: string): Promise<RunResult> {
+    this.history.push({ role: "user", content: userMessage })
+    return this.loop()
   }
 
+  /** Feed verification / system errors back into the same conversation and keep tool-looping. */
+  async continue(feedback: string): Promise<RunResult> {
+    this.history.push({ role: "user", content: feedback })
+    return this.loop()
+  }
 
-export class AgentBrain{
-    private history:Message[] = [];
-    private client: Anthropic;
-    constructor(private systemPrompt:string,private toolExecutor?:ToolExecutor){
-        this.systemPrompt = systemPrompt;
-        if(toolExecutor){
-            this.toolExecutor = toolExecutor;
-        }
-        this,this.client = new Anthropic({
-            apiKey:process.env.ANTHROPIC_API_KEY
+  private async loop(): Promise<RunResult> {
+    const MAX_ITERATIONS = Number(process.env.AGENT_MAX_ITERATIONS ?? 40)
+    let iterations = 0
+
+    while (true) {
+      if (iterations >= MAX_ITERATIONS) {
+        logger.error("Agent exceeded max iterations")
+        throw new Error(`Agent exceeded max iterations (${MAX_ITERATIONS})`)
+      }
+      iterations++
+
+      const { provider, model } = this.opts.router.modelFor(this.opts.role)
+      this.opts.onThought?.({
+        status: "thinking",
+        agent: this.opts.role,
+        text: `Thinking (${provider}/${model})…`,
+        model,
+        provider,
+      })
+
+      let response
+      try {
+        response = await this.opts.router.chat(this.opts.role, {
+          system: this.effectiveSystemPrompt(),
+          messages: this.history,
+          tools: this.opts.toolExecutor ? AGENT_TOOLS : [],
         })
-
-    }
-
-    async run(userMessage: string): Promise<string> {
-        try {
-          // push user message — don't reset history
-          this.history.push({ role: "user", content: userMessage })
-      
-          let iterations = 0
-          const MAX_ITERATIONS = 20
-      
-          while (true) {
-            if (iterations > MAX_ITERATIONS) {
-                logger.error("Agent exceeded max iterations")
-              throw new Error("Agent exceeded max iterations")
-            }
-            iterations++
-      
-            const response = await this.client.messages.create({
-              model: "claude-haiku-4-5-20251001",
-              max_tokens: 4096,
-              system: this.systemPrompt,
-              messages: this.history,
-              tools: this.toolExecutor ? TOOLS : []
-            } )
-      
-            // Claude is done — extract text and return
-            if (response.stop_reason === "end_turn") {
-              const textBlock = response.content.find((b: ContentBlock) => b.type === "text")
-              return textBlock ? textBlock.text : ""
-            }
-      
-            // Claude wants to call tools
-            if (response.stop_reason === "tool_use") {
-              // step 1 — push Claude's full response to history first
-              this.history.push({ role: "assistant", content: response.content })
-      
-              // step 2 — collect all tool results
-              const toolResults = []
-      
-              for (const block of response.content) {
-                if (block.type === "tool_use") {
-                  logger.info(`Tool called: ${block.name} with args: ${JSON.stringify(block.input)}`)
-      
-                  // dispatch to the right tool
-                  let result: ToolResult
-      
-                  switch (block.name) {
-                    case "run_shell":
-                      result = await this.toolExecutor?.run_shell(
-                        (block.input as any).command,
-                        (block.input as any).timeoutMs
-                      ) as any
-                      break
-                    case "read_file":
-                      result = await this.toolExecutor?.read_file((block.input as any).filePath,(block.input as any).timeoutMs) as any
-                      break
-                    case "write_file":
-                      result = await this.toolExecutor?.write_file(
-                        (block.input as any).filePath,
-                        (block.input as any).content,
-                        (block.input as any).timeoutMs
-                      ) as any
-                      break
-                    case "git_commit":
-                      result = await this.toolExecutor?.git_commit((block.input as any).message,(block.input as any).timeoutMs) as any
-                      break
-                    case "git_checkout":
-                      result = await this.toolExecutor?.git_checkout((block.input as any).branch,(block.input as any).timeoutMs) as any
-                      break
-                    default:
-                      result = { success: false, output: "", error: `Unknown tool: ${block.name}` }
-                  }
-      
-                  toolResults.push({
-                    type: "tool_result" as const,
-                    tool_use_id: block.id,  // must match Claude's id
-                    content: result.success ? result.output : `ERROR: ${result.error}`
-                  })
-                }
-              }
-      
-              // step 3 — push all tool results back as one user message
-              this.history.push({ role: "user", content: toolResults as any})
-      
-              // loop continues — Claude sees results and decides next step
-            }
+      } catch (error) {
+        if (isToolValidationError(error) || isAgentRecoverableError(error) || isOutputParseFailed(error)) {
+          this.recoverableErrors++
+          logger.warn("Recoverable agent error — feeding structured feedback", {
+            attempt: this.recoverableErrors,
+            error: error instanceof Error ? error.message.slice(0, 200) : error,
+          })
+          if (this.recoverableErrors > MAX_RECOVERABLE_ERRORS) {
+            throw error
           }
-      
-        } catch (error) {
-          logger.error(`Error running agent: ${error}`)
-          throw error
+          this.pruneCorruptedHistoryTail()
+          this.history.push({
+            role: "user",
+            content: buildAgentRecoveryPrompt(error, this.recoverableErrors, MAX_RECOVERABLE_ERRORS, {
+              ...(this.lastToolAttempted ? { lastTool: this.lastToolAttempted } : {}),
+            }),
+          })
+          continue
+        }
+        throw error
+      }
+
+      this.recoverableErrors = 0
+
+      this.llmCalls++
+      this.accumulateUsage(response.usage)
+
+      if (response.text.trim()) {
+        this.opts.onThought?.({
+          status: "reasoning",
+          agent: this.opts.role,
+          text: response.text.trim(),
+          model: response.model,
+          provider: response.provider,
+        })
+      }
+
+      if (response.stopReason === "end_turn") {
+        const text = response.text.trim()
+        if (text.includes('"type":"tool_use"') || text.includes("tool_use") || text.includes("<function/")) {
+          this.history.push({ role: "assistant", content: text })
+          this.history.push({
+            role: "user",
+            content: "Your last response was invalid tool-call JSON. Use the provided tools (run_shell, read_file, write_file, etc.) — do not invent tool names. If the step requires a code change, use write_file now.",
+          })
+          continue
+        }
+        // Reject empty or tool-less completions when tools are available — the model
+        // must actually inspect/edit the repo, not hallucinate "STEP COMPLETE".
+        if (this.opts.toolExecutor && this.toolInvocations === 0) {
+          this.history.push({ role: "assistant", content: text || "(empty response)" })
+          this.history.push({
+            role: "user",
+            content: "You returned without using any tools. This step requires real work in the sandbox. Start by calling read_file or view_file on the target file, then write_file to apply changes. Do not claim the step is done until you have used tools.",
+          })
+          continue
+        }
+        if (this.opts.toolExecutor && !this.wroteFile && text.toUpperCase().includes("STEP COMPLETE")) {
+          this.history.push({ role: "assistant", content: text })
+          this.history.push({
+            role: "user",
+            content: 'You said STEP COMPLETE but never called write_file. If the step requires a code change, call write_file now. If the file already satisfies the requirement, run `git diff` to confirm and summarize what is already present.',
+          })
+          continue
+        }
+        return { text: response.text, usage: { ...this.totalUsage }, llmCalls: this.llmCalls }
+      }
+
+      if (response.stopReason === "tool_use" && response.toolCalls.length > 0) {
+        const assistantContent: LLMMessageContent[] = []
+        if (response.text) assistantContent.push({ type: "text", text: response.text })
+        for (const tc of response.toolCalls) {
+          assistantContent.push({
+            type: "tool_use",
+            id: tc.id,
+            name: canonicalToolName(tc.name),
+            input: tc.input,
+          })
+        }
+        this.history.push({ role: "assistant", content: assistantContent })
+
+        const toolResults: LLMMessageContent[] = []
+
+        let wroteFile = false
+        for (const tc of response.toolCalls) {
+          this.lastToolAttempted = tc.name
+          logger.info(`Tool called: ${tc.name} with args: ${JSON.stringify(tc.input).slice(0, 200)}`)
+          this.opts.onToolEvent?.({ type: "tool_call", tool: tc.name, args: tc.input })
+          this.toolInvocations++
+          if (tc.name === "write_file") wroteFile = true
+
+          const start = Date.now()
+          const result = await this.dispatchTool(tc.name, tc.input)
+          const durationMs = Date.now() - start
+
+          this.opts.onToolEvent?.({
+            type: "tool_result",
+            tool: tc.name,
+            success: result.success,
+            output: result.success ? result.output : (result.error ?? ""),
+            durationMs,
+          })
+
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content: capToolContent(result.success ? result.output : `ERROR: ${result.error}`),
+          })
+        }
+
+        if (wroteFile) {
+          this.exploreOnlyRounds = 0
+          this.wroteFile = true
+        } else if (response.toolCalls.every((tc) => EXPLORE_TOOLS.has(tc.name))) {
+          this.exploreOnlyRounds++
+          if (this.exploreOnlyRounds >= 3) {
+            toolResults.push({
+              type: "text",
+              text: "You have searched/read enough. The step requires a code change — call write_file now. For Redis health checks, create a new ioredis Redis() instance inline; checkpointStore does not export a redis client.",
+            })
+            this.exploreOnlyRounds = 0
+          }
+        }
+
+        this.history.push({ role: "user", content: toolResults })
+        this.trimHistory()
+
+        if (response.text.toUpperCase().includes("STEP COMPLETE")) {
+          return { text: response.text, usage: { ...this.totalUsage }, llmCalls: this.llmCalls }
         }
       }
-    getHistory():Message[]{
-        return this.history
     }
-    setHistory(history:Message[]):void{
-        this.history = history
+  }
 
+  private async dispatchTool(name: string, input: Record<string, unknown>): Promise<ToolResult> {
+    const executor = this.opts.toolExecutor
+    if (!executor) return { success: false, output: "", error: "No tool executor" }
+
+    const tool = canonicalToolName(name)
+
+    switch (tool) {
+      case "run_shell": {
+        const args = input as ToolInput["run_shell"]
+        return executor.run_shell(args.command, args.timeoutMs)
+      }
+      case "read_file": {
+        const args = input as ToolInput["read_file"]
+        return executor.read_file(args.filePath, args.timeoutMs)
+      }
+      case "write_file": {
+        const args = input as ToolInput["write_file"]
+        return executor.write_file(args.filePath, args.content, args.timeoutMs)
+      }
+      case "git_commit": {
+        const args = input as ToolInput["git_commit"]
+        return executor.git_commit(args.message, args.timeoutMs)
+      }
+      case "git_checkout": {
+        const args = input as ToolInput["git_checkout"]
+        return executor.git_checkout(args.branch, args.timeoutMs)
+      }
+      case "search_code": {
+        const args = input as ToolInput["search_code"]
+        const maxResults = typeof args.max_results === "number" ? args.max_results : 30
+        return executor.search_code(args.query, args.path, maxResults)
+      }
+      case "print_tree": {
+        const args = input as ToolInput["print_tree"]
+        return executor.print_tree(args.path, args.depth)
+      }
+      case "view_file": {
+        const args = input as ToolInput["view_file"]
+        return executor.view_file(args.filePath, args.startLine, args.endLine)
+      }
+      case "list_dir": {
+        const args = input as ToolInput["list_dir"]
+        return executor.list_dir(args.path, args.depth)
+      }
+      default:
+        return {
+          success: false,
+          output: "",
+          error: `Unknown tool: ${name}. Available: ${AGENT_TOOLS.map((t) => t.name).join(", ")}`,
+        }
+    }
+  }
+
+  /** Drop trailing assistant tool_use turns that never got results — fixes cross-provider message errors. */
+  private pruneCorruptedHistoryTail() {
+    while (this.history.length > 0) {
+      const last = this.history[this.history.length - 1]
+      if (
+        last?.role === "assistant" &&
+        Array.isArray(last.content) &&
+        last.content.some((c) => c.type === "tool_use")
+      ) {
+        this.history.pop()
+        continue
+      }
+      if (
+        last?.role === "user" &&
+        Array.isArray(last.content) &&
+        last.content.every((c) => c.type === "tool_result")
+      ) {
+        this.history.pop()
+        continue
+      }
+      break
+    }
+  }
+
+  private trimHistory() {
+    const maxMessages = HISTORY_WINDOW_ROUNDS * 2
+    if (this.history.length <= maxMessages) return
+
+    let start = this.history.length - maxMessages
+    while (start < this.history.length) {
+      const m = this.history[start]
+      if (
+        m?.role === "user" &&
+        Array.isArray(m.content) &&
+        m.content.length > 0 &&
+        m.content.every((c) => c.type === "tool_result")
+      ) {
+        start++
+      } else {
+        break
+      }
     }
 
-    
+    const dropped = this.history.splice(0, start)
+    const summary = dropped
+      .map((m) => {
+        if (typeof m.content === "string") return m.content.slice(0, 120)
+        return m.content
+          .filter((c) => c.type === "text")
+          .map((c) => (c.type === "text" ? c.text : ""))
+          .join(" ")
+          .slice(0, 120)
+      })
+      .filter(Boolean)
+      .join(" | ")
+      .slice(0, 800)
+
+    if (summary) {
+      this.historyDigest = `${this.historyDigest}\n${summary}`.slice(-800)
+    }
+  }
+
+  private effectiveSystemPrompt(): string {
+    if (!this.historyDigest) return this.opts.systemPrompt
+    return `${this.opts.systemPrompt}\n\n# Prior context (summarized)\n${this.historyDigest}`
+  }
+
+  private accumulateUsage(usage: Usage) {
+    this.totalUsage.inputTokens += usage.inputTokens
+    this.totalUsage.outputTokens += usage.outputTokens
+    this.totalUsage.costUsd += usage.costUsd
+  }
+
+  getHistory(): LLMMessage[] {
+    return this.history
+  }
+
+  setHistory(history: LLMMessage[]): void {
+    this.history = history
+  }
+
+  getUsage(): Usage {
+    return { ...this.totalUsage }
+  }
 }
