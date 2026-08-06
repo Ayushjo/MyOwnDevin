@@ -1,11 +1,20 @@
 {
-  "name": "backtobasics",
+  "name": "myowndevin-backend",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "tsc -b && node dist/index.js",
-    "dev": "nodemon --watch src --ext ts --exec \"node --env-file=.env --loader ts-node/esm src/index.ts\""
+    "dev": "nodemon --watch src --ext ts --exec \"npm run build && node --env-file=.env dist/index.js\"",
+    "build": "tsc -b && cp src/sandbox/Dockerfile dist/sandbox/Dockerfile",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:llm": "vitest run src/llm",
+    "test:eval": "vitest run src/evals",
+    "benchmark": "node --env-file=.env --loader ts-node/esm benchmarks/runBenchmark.ts",
+    "watch": "node --env-file=.env scripts/watchAndRun.mjs",
+    "monitor": "node --env-file=.env scripts/monitorTask.mjs",
+    "issue:hard": "node --env-file=.env scripts/createIssue10.mjs"
   },
   "keywords": [],
   "author": "",
@@ -13,11 +22,13 @@
   "description": "",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
+    "@google/genai": "^2.19.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.10",
     "@types/winston": "^2.4.4",
     "bullmq": "^5.78.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dockerode": "^5.0.0",
     "dotenv": "^17.4.2",
@@ -26,13 +37,18 @@
     "morgan": "^1.10.1",
     "nodemon": "^3.1.14",
     "octokit": "^5.0.5",
+    "openai": "^7.8.0",
     "simple-git": "^3.36.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "uuid": "^14.0.0",
-    "winston": "^3.19.0"
+    "winston": "^3.19.0",
+    "zod": "^4.5.2"
   },
   "devDependencies": {
-    "@types/dockerode": "^4.0.1"
+    "@types/cookie-parser": "^1.4.10",
+    "@types/dockerode": "^4.0.1",
+    "tsx": "^4.23.12",
+    "vitest": "^3.2.7"
   }
 }
