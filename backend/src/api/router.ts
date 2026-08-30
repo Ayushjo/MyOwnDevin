@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { taskQueue } from "../BullMQ/worker.js";
 import { EventBus } from "../events/eventBus.js";
 import type { CheckpointStore } from "../store/checkpointStore.js";
+import { taskRegistry } from '../store/taskRegistry.js'; // Import taskRegistry
 
 export const createRouter = (eventBus: EventBus, checkpointStore: CheckpointStore) => {
   const router = Router();
@@ -62,6 +63,30 @@ export const createRouter = (eventBus: EventBus, checkpointStore: CheckpointStor
       res.status(500).json({ error: "Internal server error" })
     }
   })
+
+  // New route for paginated task listing
+  router.get("/tasks", async (req, res) => {
+    const { limit = 10, offset = 0, status, q } = req.query;
+    try {
+      const opts = { limit: Number(limit), offset: Number(offset), status, query: q };
+      const { tasks, total } = await taskRegistry.list(opts);
+      res.status(200).json({ tasks, total, limit, offset });
+    } catch (error) {
+      logger.error("Error fetching tasks: " + error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Replace inline loop in GET /api/stats with aggregateStats
+  router.get("/stats", async (req, res) => {
+    try {
+      const stats = await taskRegistry.aggregateStats();
+      res.status(200).json({ totalCostUsd: stats.totalCostUsd });
+    } catch (error) {
+      logger.error("Error fetching stats: " + error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
 
   return router;
 }
