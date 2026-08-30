@@ -5,6 +5,7 @@ import TaskCard from '../components/TaskCard'
 import { getTasks, type StoredTask } from '../store/taskStore'
 import type { TaskStatus } from '../types/task'
 
+
 type Filter = 'all' | TaskStatus
 
 const FILTERS: { key: Filter; label: string }[] = [
@@ -53,6 +54,7 @@ export default function Dashboard() {
     { label: 'Running',   value: allTasks.filter(t => t.status === 'running').length,  color: 'text-warning'   },
     { label: 'Completed', value: allTasks.filter(t => t.status === 'done').length,     color: 'text-success'   },
     { label: 'Failed',    value: allTasks.filter(t => t.status === 'failed').length,   color: 'text-danger'    },
+    { label: 'Cancelled',  value: allTasks.filter(t => t.status === 'cancelled').length, color: 'text-danger'    },
   ]
 
   return (
@@ -70,7 +72,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stats strip */}
-        <div className="grid grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-5 gap-3 mb-8">
           {stats.map(s => (
             <div key={s.label} className="bg-surface border border-subtle rounded-xl p-4">
               <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -98,16 +100,13 @@ export default function Dashboard() {
         {/* Task list */}
         {allTasks.length === 0 ? (
           <EmptyState />
-        ) : filtered.length === 0 ? (
-          <p className="text-slate-500 text-sm py-12 text-center">
-            No {filter} tasks.
-          </p>
         ) : (
-          <div className="flex flex-col gap-2.5">
-            {filtered.map(task => <TaskCard key={task.id} task={task} />)}
+          <div className="grid grid-cols-1 gap-4">
+            {filtered.map(task => (
+              <TaskCard key={task.id} task={task} />
+            ))}
           </div>
         )}
-
       </main>
     </div>
   )

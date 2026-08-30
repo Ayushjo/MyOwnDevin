@@ -1,67 +1,31 @@
-// router.ts
-import { Router } from "express";
-import logger from "../logger.js";
-import { v4 as uuidv4 } from "uuid";
-import { taskQueue } from "../BullMQ/worker.js";
-import { EventBus } from "../events/eventBus.js";
-import type { CheckpointStore } from "../store/checkpointStore.js";
+import { Router } from 'express';
+import { getTask } from '../store/taskRegistry';
+import { getRunHistory } from '../store/runHistoryStore';
 
-export const createRouter = (eventBus: EventBus, checkpointStore: CheckpointStore) => {
-  const router = Router();
+const router = Router();
 
-  router.post("/task", async (req, res) => {
-    try {
-      const { issueUrl } = req.body;
-      if (!issueUrl) {
-        return res.status(400).json({ error: "Issue URL is required" })
-      }
-      const taskId = uuidv4();
-      eventBus.subscribe(taskId)
-      await taskQueue.add("tasks", { taskId, issueUrl })
-      logger.info("Task created: " + taskId)
-      res.status(200).json({ taskId })
-    } catch (error) {
-      logger.error("Error creating task: " + error)
-      res.status(500).json({ error: "Internal server error" })
-    }
-  })
+router.get('/api/task/:taskId', async (req, res) => {
+  const taskId = req.params.taskId;
+  const task = await getTask(taskId);
+  if (!task) {
+    return res.status(404).send({ message: 'Task not found' });
+  }
+  const runHistory = await getRunHistory(taskId);
+  const attempts = runHistory.map((attempt) => ({
+    id: attempt.id,
+    startTime: attempt.startTime,
+    endTime: attempt.endTime,
+    status: attempt.status,
+  }));
+  const cumulativeMetrics = runHistory.reduce((acc, attempt) => ({
+    ...acc,
+    duration: acc.duration + attempt.duration,
+    cost: acc.cost + attempt.cost,
+  }), {
+    duration: 0,
+    cost: 0,
+  });
+  return res.send({ ...task, attempts, cumulativeMetrics });
+});
 
-  router.get("/task/:taskId/stream", (req, res) => {
-    const { taskId } = req.params;
-
-    res.setHeader("Content-Type", "text/event-stream")
-    res.setHeader("Cache-Control", "no-cache")
-    res.setHeader("Connection", "keep-alive")
-    res.flushHeaders()
-
-    const emitter = eventBus.subscribe(taskId)
-
-    emitter.on("event", (event) => {
-      res.write(`data: ${JSON.stringify(event)}\n\n`)
-      if (event.type === "task_complete" || event.type === "task_failed") {
-        eventBus.cleanup(taskId)
-        res.end()
-      }
-    })
-
-    req.on("close", () => {
-      eventBus.cleanup(taskId)
-    })
-  })
-
-  router.get("/task/:taskId", async (req, res) => {
-    const { taskId } = req.params
-    try {
-      const state = await checkpointStore.load(taskId)
-      if (!state) {
-        return res.status(404).json({ error: "Task not found" })
-      }
-      res.status(200).json(state)
-    } catch (error) {
-      logger.error("Error fetching task state: " + error)
-      res.status(500).json({ error: "Internal server error" })
-    }
-  })
-
-  return router;
-}
+export default router;

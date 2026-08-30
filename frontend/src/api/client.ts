@@ -31,3 +31,14 @@ export async function getTaskState(taskId: string): Promise<Record<string, unkno
     return null
   }
 }
+
+/** Cancels a running task. */
+export async function cancelTask(taskId: string): Promise<void> {
+  const res = await fetch(`${BASE}/api/task/${taskId}/cancel`, {
+    method: 'POST',
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(body || `HTTP ${res.status}`)
+  }
+}

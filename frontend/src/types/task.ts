@@ -1,4 +1,4 @@
-export type TaskStatus = 'queued' | 'planning' | 'running' | 'verifying' | 'done' | 'failed'
+export type TaskStatus = 'queued' | 'planning' | 'running' | 'verifying' | 'done' | 'failed' | 'cancelled'
 
 export type StepStatus = 'pending' | 'running' | 'done' | 'failed'
 
@@ -28,4 +28,6 @@ export type Task = {
   createdAt: string
   elapsedSeconds?: number
   prUrl?: string
+  attempts?: Array<{ duration: number; cost: number; reason?: string }>
+  cumulativeMetrics?: Record<string, unknown>
 }
