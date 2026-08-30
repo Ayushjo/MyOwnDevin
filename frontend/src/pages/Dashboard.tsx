@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import TaskCard from '../components/TaskCard'
-import { getTasks, type StoredTask } from '../store/taskStore'
+import { listTasksPaginated } from '../api/client'
+import type { StoredTask } from '../store/taskStore'
 import type { TaskStatus } from '../types/task'
 
 type Filter = 'all' | TaskStatus
@@ -17,7 +18,6 @@ const FILTERS: { key: Filter; label: string }[] = [
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
-      {/* Empty terminal SVG */}
       <svg width="72" height="56" viewBox="0 0 72 56" fill="none" className="mb-5 opacity-30">
         <rect x="1" y="1" width="70" height="54" rx="8" stroke="#1E2D42" strokeWidth="2" />
         <rect x="1" y="1" width="70" height="12" rx="8" fill="#0D1320" />
@@ -36,13 +36,18 @@ function EmptyState() {
 }
 
 export default function Dashboard() {
-  const [filter,   setFilter]   = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>('all')
   const [allTasks, setAllTasks] = useState<StoredTask[]>([])
+  const [totalCostUsd, setTotalCostUsd] = useState<number | null>(null)
 
-  // Load from localStorage on mount; re-read when the user navigates back here.
   useEffect(() => {
-    setAllTasks(getTasks())
-  }, [])
+    const fetchTasks = async () => {
+      const response = await listTasksPaginated(10, 0, filter === 'all' ? undefined : filter);
+      setAllTasks(response.tasks);
+      setTotalCostUsd(response.totalCostUsd);
+    };
+    fetchTasks();
+  }, [filter])
 
   const filtered = filter === 'all'
     ? allTasks
@@ -53,14 +58,13 @@ export default function Dashboard() {
     { label: 'Running',   value: allTasks.filter(t => t.status === 'running').length,  color: 'text-warning'   },
     { label: 'Completed', value: allTasks.filter(t => t.status === 'done').length,     color: 'text-success'   },
     { label: 'Failed',    value: allTasks.filter(t => t.status === 'failed').length,   color: 'text-danger'    },
+    { label: 'Total Cost', value: totalCostUsd ? `$${totalCostUsd.toFixed(2)}` : 'N/A', color: 'text-info' },
   ]
 
   return (
     <div className="min-h-screen">
       <Navbar />
       <main className="max-w-4xl mx-auto px-6 pt-24 pb-16">
-
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-white">Tasks</h1>
@@ -68,8 +72,6 @@ export default function Dashboard() {
           </div>
           <Link to="/tasks/new" className="btn-primary">+ New Task</Link>
         </div>
-
-        {/* Stats strip */}
         <div className="grid grid-cols-4 gap-3 mb-8">
           {stats.map(s => (
             <div key={s.label} className="bg-surface border border-subtle rounded-xl p-4">
@@ -78,8 +80,6 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
-
-        {/* Filter tabs */}
         <div className="flex gap-1 mb-5 bg-surface border border-subtle rounded-lg p-1 w-fit">
           {FILTERS.map(f => (
             <button
@@ -94,8 +94,6 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-
-        {/* Task list */}
         {allTasks.length === 0 ? (
           <EmptyState />
         ) : filtered.length === 0 ? (
@@ -107,7 +105,6 @@ export default function Dashboard() {
             {filtered.map(task => <TaskCard key={task.id} task={task} />)}
           </div>
         )}
-
       </main>
     </div>
   )
