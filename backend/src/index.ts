@@ -6,6 +6,8 @@ import { EventBus } from './events/eventBus.js';
 import { startWorker } from './BullMQ/worker.js';
 import { createRouter } from './api/router.js';
 import { CheckpointStore } from './store/checkpointStore.js';
+import { Redis } from 'ioredis';
+
 const app = express();
 
 app.use(cors({ origin: process.env.FRONTEND_URL ?? "http://localhost:5173" }));
@@ -30,7 +32,8 @@ app.use(
 
 const eventBus = new EventBus();
 const checkpointStore = new CheckpointStore();
-const worker = startWorker(eventBus,checkpointStore);
+const redisClient = new Redis();
+const worker = startWorker(eventBus, checkpointStore);
 app.use("/api", createRouter(eventBus, checkpointStore));
 const PORT = process.env.PORT || 3500
 app.listen(PORT,()=>{
