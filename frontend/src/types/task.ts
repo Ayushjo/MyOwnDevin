@@ -29,3 +29,11 @@ export type Task = {
   elapsedSeconds?: number
   prUrl?: string
 }
+
+// Define PaginatedTasksResponse type
+export type PaginatedTasksResponse = {
+  tasks: Task[];
+  total: number;
+  limit: number;
+  offset: number;
+};
