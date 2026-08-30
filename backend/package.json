@@ -10,7 +10,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "A Node.js Express API for the Back to Basics project.",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
     "@types/cors": "^2.8.17",
