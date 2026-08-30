@@ -6,7 +6,14 @@ import { EventBus } from './events/eventBus.js';
 import { startWorker } from './BullMQ/worker.js';
 import { createRouter } from './api/router.js';
 import { CheckpointStore } from './store/checkpointStore.js';
+import { createClient } from "redis";
+
 const app = express();
+const redisClient = createClient({
+  url: process.env.REDIS_URL || "redis://127.0.0.1:6379"
+});
+redisClient.on("error", (err) => logger.error("Redis Client Error: " + err));
+await redisClient.connect();
 
 app.use(cors({ origin: process.env.FRONTEND_URL ?? "http://localhost:5173" }));
 app.use(express.json());
@@ -31,7 +38,7 @@ app.use(
 const eventBus = new EventBus();
 const checkpointStore = new CheckpointStore();
 const worker = startWorker(eventBus,checkpointStore);
-app.use("/api", createRouter(eventBus, checkpointStore));
+app.use("/api", createRouter(eventBus, checkpointStore, redisClient));
 const PORT = process.env.PORT || 3500
 app.listen(PORT,()=>{
     logger.info(`Server is running on port ${PORT}`);

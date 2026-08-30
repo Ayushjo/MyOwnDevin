@@ -6,7 +6,9 @@ import { taskQueue } from "../BullMQ/worker.js";
 import { EventBus } from "../events/eventBus.js";
 import type { CheckpointStore } from "../store/checkpointStore.js";
 
-export const createRouter = (eventBus: EventBus, checkpointStore: CheckpointStore) => {
+export const createRouter = (eventBus: EventBus, checkpointStore: CheckpointStore,
+  redisClient: any
+) => {
   const router = Router();
 
   router.post("/task", async (req, res) => {
@@ -62,6 +64,19 @@ export const createRouter = (eventBus: EventBus, checkpointStore: CheckpointStor
       res.status(500).json({ error: "Internal server error" })
     }
   })
+
+
+router.get("/health", async (_req, res) => {
+  const uptime = Math.floor(process.uptime());
+  try {
+    const reply = await redisClient.ping();
+    const redisStatus = reply === "PONG" ? "connected" : "disconnected";
+    return res.status(200).json({ status: "ok", redis: redisStatus, uptime });
+  } catch (error) {
+    logger.warn("Health check Redis ping failed: " + error);
+    return res.status(200).json({ status: "ok", redis: "disconnected", uptime });
+  }
+});
 
   return router;
 }

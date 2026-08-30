@@ -151,3 +151,68 @@
 {"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T14:00:37.595Z"}
 {"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T14:00:39.486Z"}
 {"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 8200","timestamp":"2026-06-02T14:01:11.388Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-08-30T07:10:56.588Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-08-30T07:17:07.555Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: TypeError: Cannot read properties of undefined (reading 'ping')","timestamp":"2026-08-30T07:17:29.613Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"6.204\"}","timestamp":"2026-08-30T07:17:29.623Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: TypeError: Cannot read properties of undefined (reading 'ping')","timestamp":"2026-08-30T07:18:18.547Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"4.467\"}","timestamp":"2026-08-30T07:18:18.552Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: TypeError: Cannot read properties of undefined (reading 'ping')","timestamp":"2026-08-30T07:19:37.323Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"56.197\"}","timestamp":"2026-08-30T07:19:37.355Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: TypeError: Cannot read properties of undefined (reading 'ping')","timestamp":"2026-08-30T07:21:07.958Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"3.994\"}","timestamp":"2026-08-30T07:21:07.961Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: TypeError: Cannot read properties of undefined (reading 'ping')","timestamp":"2026-08-30T07:21:09.919Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"3.875\"}","timestamp":"2026-08-30T07:21:09.924Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: TypeError: Cannot read properties of undefined (reading 'ping')","timestamp":"2026-08-30T07:21:10.724Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"2.037\"}","timestamp":"2026-08-30T07:21:10.726Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: TypeError: Cannot read properties of undefined (reading 'ping')","timestamp":"2026-08-30T07:21:11.412Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"2.165\"}","timestamp":"2026-08-30T07:21:11.415Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-08-30T07:21:55.313Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: TypeError: Cannot read properties of undefined (reading 'isOpen')","timestamp":"2026-08-30T07:22:16.564Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"4.850\"}","timestamp":"2026-08-30T07:22:16.571Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-08-30T07:22:29.490Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: TypeError: Cannot read properties of undefined (reading 'isOpen')","timestamp":"2026-08-30T07:22:35.506Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"6.179\"}","timestamp":"2026-08-30T07:22:35.514Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"Server is running on port 3500","timestamp":"2026-08-30T07:29:52.821Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"11.138\"}","timestamp":"2026-08-30T07:29:59.698Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: Socket closed unexpectedly","timestamp":"2026-08-30T07:30:19.457Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: Socket closed unexpectedly","timestamp":"2026-08-30T07:30:19.478Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: Socket closed unexpectedly","timestamp":"2026-08-30T07:30:19.480Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: Socket closed unexpectedly","timestamp":"2026-08-30T07:30:19.656Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: Socket closed unexpectedly","timestamp":"2026-08-30T07:30:19.657Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: Socket closed unexpectedly","timestamp":"2026-08-30T07:30:19.946Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: Socket closed unexpectedly","timestamp":"2026-08-30T07:30:19.948Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: Socket closed unexpectedly","timestamp":"2026-08-30T07:30:20.297Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: Socket closed unexpectedly","timestamp":"2026-08-30T07:30:20.298Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:20.769Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:21.701Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:23.421Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:25.435Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:27.529Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:29.596Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:31.783Z"}
+{"level":"\u001b[33mwarn\u001b[39m","message":"Health check Redis ping failed: Error","timestamp":"2026-08-30T07:30:32.170Z"}
+{"level":"\u001b[32minfo\u001b[39m","message":"{\"method\":\"GET\",\"url\":\"/api/health\",\"status\":\"200\",\"responseTime\":\"5010.997\"}","timestamp":"2026-08-30T07:30:32.173Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:33.904Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:35.940Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:38.064Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:40.106Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:42.253Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:44.319Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:46.406Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:48.439Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:50.456Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:52.521Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:54.669Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:56.695Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:30:58.803Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:00.884Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:03.020Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:05.189Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:07.353Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:09.367Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:11.552Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:13.700Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:15.744Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:17.807Z"}
+{"level":"\u001b[31merror\u001b[39m","message":"Redis Client Error: Error: connect ECONNREFUSED 127.0.0.1:6379","timestamp":"2026-08-30T07:31:19.849Z"}
