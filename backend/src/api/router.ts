@@ -5,6 +5,10 @@ import { v4 as uuidv4 } from "uuid";
 import { taskQueue } from "../BullMQ/worker.js";
 import { EventBus } from "../events/eventBus.js";
 import type { CheckpointStore } from "../store/checkpointStore.js";
+import Redis from 'ioredis';
+
+// Create a new Redis instance for health checks
+const redis = new Redis();
 
 export const createRouter = (eventBus: EventBus, checkpointStore: CheckpointStore) => {
   const router = Router();
