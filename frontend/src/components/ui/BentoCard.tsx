@@ -9,8 +9,8 @@ function BentoCard({ className, interactive = true, children, ...props }: BentoC
   return (
     <div
       className={cn(
-        'group relative flex flex-col rounded-xl border border-line bg-paper overflow-hidden',
-        interactive && 'transition-colors duration-200 hover:border-primary/30',
+        'group relative flex flex-col rounded-xl border border-border bg-card overflow-hidden',
+        interactive && 'transition-colors duration-micro hover:border-primary/40',
         className,
       )}
       {...props}
@@ -32,18 +32,18 @@ function BentoHeader({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 px-4 py-3 border-b border-line bg-canvas/50 shrink-0',
+        'flex items-center justify-between gap-3 px-5 py-3.5 border-b border-border bg-muted shrink-0',
         className,
       )}
     >
-      <div className="min-w-0">{children}</div>
-      {action}
+      <div className="min-w-0 flex-1">{children}</div>
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   )
 }
 
 function BentoContent({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn('p-4 flex-1', className)}>{children}</div>
+  return <div className={cn('p-6 flex-1', className)}>{children}</div>
 }
 
 export { BentoCard, BentoHeader, BentoContent }

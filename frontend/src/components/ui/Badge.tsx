@@ -4,11 +4,11 @@ import { cn } from '../../lib/cn'
 type Tone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
 
 const TONES: Record<Tone, string> = {
-  neutral: 'bg-slate-100 text-slate-600 border-slate-200',
-  primary: 'bg-primary-soft text-primary-dark border-primary/20',
-  success: 'bg-green-50 text-green-700 border-green-200',
-  warning: 'bg-amber-50 text-amber-700 border-amber-200',
-  danger:  'bg-red-50 text-red-700 border-red-200',
+  neutral: 'bg-muted text-muted-foreground border-border',
+  primary: 'bg-primary/10 text-primary border-primary/20',
+  success: 'bg-green-50 text-success border-green-200',
+  warning: 'bg-amber-50 text-warning border-amber-200',
+  danger: 'bg-red-50 text-destructive border-red-200',
 }
 
 export default function Badge({
@@ -23,16 +23,16 @@ export default function Badge({
   dot?: boolean
 }) {
   const dotColor: Record<Tone, string> = {
-    neutral: 'bg-slate-400',
+    neutral: 'bg-muted-foreground',
     primary: 'bg-primary',
     success: 'bg-success',
     warning: 'bg-warning',
-    danger:  'bg-danger',
+    danger: 'bg-danger',
   }
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border',
+        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border',
         TONES[tone],
         className,
       )}

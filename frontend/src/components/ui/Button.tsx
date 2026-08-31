@@ -1,11 +1,10 @@
 import { forwardRef, type ReactNode } from 'react'
-import { motion, type HTMLMotionProps } from 'framer-motion'
 import { cn } from '../../lib/cn'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dark'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'
 type Size = 'sm' | 'md' | 'lg'
 
-type ButtonProps = Omit<HTMLMotionProps<'button'>, 'ref' | 'children'> & {
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant
   size?: Size
   loading?: boolean
@@ -13,17 +12,17 @@ type ButtonProps = Omit<HTMLMotionProps<'button'>, 'ref' | 'children'> & {
 }
 
 const VARIANTS: Record<Variant, string> = {
-  primary:   'bg-primary text-white shadow-soft hover:bg-primary-dark',
-  secondary: 'bg-white text-ink border border-line hover:bg-primary-soft hover:border-primary/30',
-  ghost:     'bg-transparent text-mute hover:text-ink hover:bg-black/[0.04]',
-  danger:    'bg-danger text-white hover:brightness-95',
-  dark:      'bg-ink text-white hover:bg-ink/85 shadow-soft',
+  primary: 'bg-primary text-primary-foreground hover:brightness-95 border border-transparent',
+  secondary: 'bg-card text-foreground border border-border hover:bg-muted',
+  outline: 'bg-card text-foreground border border-border hover:bg-muted',
+  ghost: 'bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent',
+  danger: 'bg-destructive text-destructive-foreground hover:brightness-95 border border-transparent',
 }
 
 const SIZES: Record<Size, string> = {
-  sm: 'text-xs px-3 py-1.5 rounded-lg gap-1.5',
-  md: 'text-sm px-4 py-2.5 rounded-xl gap-2',
-  lg: 'text-sm px-6 py-3 rounded-xl gap-2',
+  sm: 'text-xs px-3 py-1.5 rounded-button gap-1.5',
+  md: 'text-sm px-[15px] py-[7px] rounded-button gap-2',
+  lg: 'text-sm px-5 py-2.5 rounded-button gap-2',
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -31,14 +30,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   ref,
 ) {
   return (
-    <motion.button
+    <button
       ref={ref}
-      whileHover={disabled || loading ? undefined : { y: -1 }}
-      whileTap={disabled || loading ? undefined : { scale: 0.97 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center font-semibold transition-colors duration-150 select-none',
+        'inline-flex items-center justify-center font-medium transition-all duration-micro select-none focus-ring',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         VARIANTS[variant],
         SIZES[size],
@@ -53,7 +49,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         </svg>
       )}
       {children}
-    </motion.button>
+    </button>
   )
 })
 

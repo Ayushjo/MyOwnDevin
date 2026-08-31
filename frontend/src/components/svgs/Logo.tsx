@@ -18,7 +18,7 @@ export default function Logo({
   variant = 'default',
   animated = true,
 }: LogoProps) {
-  const textClassName = variant === 'inverse' ? 'fill-white' : 'fill-ink'
+  const textClassName = variant === 'inverse' ? 'fill-white' : 'fill-foreground'
   const lockup = (
     <PullwrightLockup
       height={height}
@@ -31,8 +31,7 @@ export default function Logo({
   const inner = animated ? (
     <motion.span
       className="inline-flex group"
-      whileHover={{ scale: 1.015 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+      transition={{ duration: 0.15 }}
     >
       {lockup}
     </motion.span>

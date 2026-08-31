@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.*
+app.log
+*.log
+benchmarks/runs
+tsconfig.tsbuildinfo
+coverage
+.git

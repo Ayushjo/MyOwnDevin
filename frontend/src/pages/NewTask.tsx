@@ -84,7 +84,7 @@ export default function NewTask() {
         <motion.div variants={fadeUp}>
           <Link
             to="/dashboard"
-            className="inline-flex items-center gap-1.5 text-sm text-mute hover:text-ink transition-colors mb-6 group"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6 group"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
             Dashboard
@@ -92,24 +92,24 @@ export default function NewTask() {
         </motion.div>
 
         <motion.div variants={fadeUp}>
-          <BentoCard interactive={false} className="shadow-soft">
+          <BentoCard interactive={false}>
             <BentoContent className="p-6 sm:p-7">
               <div className="mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-canvas border border-line flex items-center justify-center">
-                    <GithubMark className="w-5 h-5 text-ink" />
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                    <GithubMark className="w-5 h-5 text-primary" />
                   </div>
                   <Badge tone="primary" dot>New task</Badge>
                 </div>
-                <h1 className="text-xl font-bold text-ink">Submit a GitHub issue</h1>
-                <p className="text-sm text-mute mt-1.5 leading-relaxed">
+                <h1 className="text-xl font-bold text-foreground">Submit a GitHub issue</h1>
+                <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                   Paste the issue URL — Pullwright takes it from there.
                 </p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-semibold text-faint mb-2 uppercase tracking-wider">
+                  <label className="block text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
                     GitHub issue URL
                   </label>
                   <Input
@@ -143,21 +143,22 @@ export default function NewTask() {
               <Separator className="my-6" />
 
               <div>
-                <p className="text-[10px] font-semibold text-faint uppercase tracking-wider mb-3">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-4">
                   What happens next
                 </p>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
+                <div className="grid gap-3 sm:grid-cols-3 sm:items-stretch">
                   {STEPS.map(({ icon: Icon, label }, i) => (
-                    <div key={label} className="flex items-center gap-2 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-6 h-6 rounded-md bg-canvas border border-line flex items-center justify-center shrink-0">
-                          <Icon className="w-3 h-3 text-mute" strokeWidth={1.75} />
-                        </span>
-                        <span className="text-xs text-mute truncate">{label}</span>
+                    <div
+                      key={label}
+                      className="flex items-center gap-3 rounded-lg border border-border bg-muted p-3.5 h-full min-h-[72px]"
+                    >
+                      <span className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 text-primary" strokeWidth={1.75} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-mono text-muted-foreground leading-none mb-1">0{i + 1}</p>
+                        <p className="text-xs font-medium text-foreground leading-snug">{label}</p>
                       </div>
-                      {i < STEPS.length - 1 && (
-                        <ArrowRight className="w-3 h-3 text-faint shrink-0 hidden sm:block" />
-                      )}
                     </div>
                   ))}
                 </div>
@@ -165,7 +166,7 @@ export default function NewTask() {
             </BentoContent>
           </BentoCard>
 
-          <p className="text-center text-faint text-xs mt-4">
+          <p className="text-center text-muted-foreground text-xs mt-4">
             Runs in an isolated Docker sandbox — your machine is never touched.
           </p>
         </motion.div>

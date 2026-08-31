@@ -1,14 +1,11 @@
 import { forwardRef, type HTMLAttributes } from 'react'
-import { motion, type HTMLMotionProps } from 'framer-motion'
 import { cn } from '../../lib/cn'
-
-/* ── shadcn compound card primitives ── */
 
 const CardRoot = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('rounded-2xl border border-line bg-paper text-ink shadow-soft', className)}
+      className={cn('rounded-lg border border-border bg-card text-card-foreground', className)}
       {...props}
     />
   ),
@@ -31,7 +28,7 @@ CardTitle.displayName = 'CardTitle'
 
 const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('text-sm text-mute', className)} {...props} />
+    <p ref={ref} className={cn('text-sm text-muted-foreground', className)} {...props} />
   ),
 )
 CardDescription.displayName = 'CardDescription'
@@ -50,28 +47,24 @@ const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
 )
 CardFooter.displayName = 'CardFooter'
 
-/* ── legacy motion card (Login, NewTask) ── */
-
-type LegacyCardProps = HTMLMotionProps<'div'> & {
+type LegacyCardProps = HTMLAttributes<HTMLDivElement> & {
   hover?: boolean
   padded?: boolean
 }
 
 function Card({ hover, padded = true, className, children, ...props }: LegacyCardProps) {
   return (
-    <motion.div
-      whileHover={hover ? { y: -3 } : undefined}
-      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+    <div
       className={cn(
-        'bg-paper rounded-2xl border border-line shadow-soft',
-        hover && 'hover:shadow-card hover:border-primary/25 cursor-pointer',
-        padded && 'p-5',
+        'bg-card rounded-lg border border-border',
+        hover && 'hover:border-primary/40 cursor-pointer transition-colors duration-micro',
+        padded && 'p-6',
         className,
       )}
       {...props}
     >
       {children}
-    </motion.div>
+    </div>
   )
 }
 

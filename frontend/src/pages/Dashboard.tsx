@@ -43,18 +43,14 @@ interface StatCardProps {
   icon: React.ReactNode
   color: string
   bgColor: string
-  borderColor: string
 }
 
-function StatCard({ label, value, icon, color, bgColor, borderColor }: StatCardProps) {
+function StatCard({ label, value, icon, color, bgColor }: StatCardProps) {
   const animated = useCountUp(value)
   return (
     <motion.div
       variants={fadeUp}
-      className="bg-paper rounded-2xl border shadow-soft p-5 flex items-start gap-4"
-      style={{ borderColor }}
-      whileHover={{ y: -2, boxShadow: '0 8px 24px -4px rgba(15,23,42,0.12)' }}
-      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+      className="bg-card rounded-xl border border-border p-5 flex items-start gap-4 transition-colors hover:bg-muted/40"
     >
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -63,8 +59,8 @@ function StatCard({ label, value, icon, color, bgColor, borderColor }: StatCardP
         <span style={{ color }}>{icon}</span>
       </div>
       <div>
-        <p className="text-2xl font-bold text-ink tabular-nums">{animated}</p>
-        <p className="text-mute text-xs mt-0.5">{label}</p>
+        <p className="text-2xl font-bold text-foreground tabular-nums">{animated}</p>
+        <p className="text-muted-foreground text-xs mt-0.5">{label}</p>
       </div>
     </motion.div>
   )
@@ -89,16 +85,16 @@ function EmptyState() {
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center justify-center py-20 text-center"
     >
-      <div className="w-16 h-16 rounded-2xl bg-primary-soft border border-primary/20 flex items-center justify-center mb-5">
+      <div className="w-16 h-16 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
         <Zap className="w-7 h-7 text-primary" />
       </div>
-      <h3 className="text-ink font-semibold text-lg mb-2">No tasks yet</h3>
-      <p className="text-mute text-sm mb-6 max-w-xs">
+      <h3 className="text-foreground font-semibold text-lg mb-2">No tasks yet</h3>
+      <p className="text-muted-foreground text-sm mb-6 max-w-xs">
         Submit a GitHub issue URL and Pullwright will plan, execute, and open a PR automatically.
       </p>
       <Link
         to="/tasks/new"
-        className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl bg-primary text-white shadow-soft hover:bg-primary-dark transition-colors"
+        className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-button bg-primary text-primary-foreground hover:brightness-95 transition-all"
       >
         <Plus className="w-4 h-4" />
         Submit first issue
@@ -184,10 +180,10 @@ export default function Dashboard() {
   const failedVal = stats?.failed  ?? allTasks.filter((t) => t.status === 'failed').length
 
   const statCards: StatCardProps[] = [
-    { label: 'Total Tasks', value: totalVal, icon: <TrendingUp className="w-5 h-5" />, color: '#1F2328', bgColor: '#F6F8FA', borderColor: '#D1D9E0' },
-    { label: 'Running', value: runningVal, icon: <Zap className="w-5 h-5" />, color: '#BF8700', bgColor: '#FFF8E6', borderColor: '#F0D78C' },
-    { label: 'Completed', value: doneVal, icon: <CheckCircle className="w-5 h-5" />, color: '#1A7F37', bgColor: '#EEF9F1', borderColor: '#A8E6BC' },
-    { label: 'Failed', value: failedVal, icon: <XCircle className="w-5 h-5" />, color: '#CF222E', bgColor: '#FFEBE9', borderColor: '#FFBBB5' },
+    { label: 'Total Tasks', value: totalVal, icon: <TrendingUp className="w-5 h-5" />, color: '#000000', bgColor: '#F2F2F2' },
+    { label: 'Running', value: runningVal, icon: <Zap className="w-5 h-5" />, color: '#2B7FFF', bgColor: '#E8F2FF' },
+    { label: 'Completed', value: doneVal, icon: <CheckCircle className="w-5 h-5" />, color: '#1A7F37', bgColor: '#EEF9F1' },
+    { label: 'Failed', value: failedVal, icon: <XCircle className="w-5 h-5" />, color: '#CF222E', bgColor: '#FFF0F0' },
   ]
 
   return (
@@ -200,14 +196,14 @@ export default function Dashboard() {
         className="mb-8 flex items-center justify-between"
       >
         <div>
-          <h1 className="text-2xl font-bold text-ink">
+          <h1 className="text-2xl font-bold text-foreground">
             {greeting()}{user?.name ?? user?.login ? `, ${user.name ?? user.login}` : ''} 👋
           </h1>
-          <p className="text-mute text-sm mt-0.5">Here's everything your agent has been working on.</p>
+          <p className="text-muted-foreground text-sm mt-0.5">Here's everything your agent has been working on.</p>
         </div>
         <Link
           to="/tasks/new"
-          className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl bg-primary text-white shadow-soft hover:bg-primary-dark transition-colors"
+          className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-button bg-primary text-primary-foreground hover:brightness-95 transition-all"
         >
           <Plus className="w-4 h-4" />
           New Task
@@ -262,7 +258,7 @@ export default function Dashboard() {
             key="none"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-mute text-sm py-12 text-center"
+            className="text-muted-foreground text-sm py-12 text-center"
           >
             No {filter} tasks.
           </motion.p>
@@ -272,7 +268,7 @@ export default function Dashboard() {
             variants={stagger(0.05)}
             initial="hidden"
             animate="show"
-            className="flex flex-col gap-2.5"
+            className="flex flex-col gap-2"
           >
             {filtered.map((task) => (
               <motion.div key={task.id} variants={fadeUp}>

@@ -14,7 +14,7 @@ import {
   Radio,
   Wallet,
 } from 'lucide-react'
-import { TopNav } from '../components/AppShell'
+import { TopNav, MobileBottomNav } from '../components/AppShell'
 import Logo from '../components/svgs/Logo'
 import { createTask } from '../api/client'
 import { addTask } from '../store/taskStore'
@@ -72,20 +72,41 @@ const LOG_LINES = [
   { t: 'phase', text: 'Opening pull request…' },
 ] as const
 
+function LogMock({ lines, limit }: { lines: readonly { t: string; text: string }[]; limit?: number }) {
+  const shown = limit ? lines.slice(0, limit) : lines
+  return (
+    <div className="log-mock p-4 space-y-1.5 min-h-[200px]">
+      {shown.map((line, i) => (
+        <div key={i} className="flex items-start gap-2">
+          <span className={cn('shrink-0 select-none', line.t === 'ok' ? 'text-success' : 'text-primary/50')}>›</span>
+          <span
+            className={cn(
+              line.t === 'ok' ? 'text-success font-medium' : 'text-foreground/75',
+              line.t === 'phase' && 'text-primary font-medium',
+            )}
+          >
+            {line.text}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function FlowStep({ label, desc, icon: Icon, step }: { label: string; desc: string; icon: ElementType; step: number }) {
   return (
     <div className="flex items-start gap-3.5">
       <div className="relative shrink-0">
-        <div className="w-10 h-10 rounded-lg bg-paper border border-line flex items-center justify-center">
-          <Icon className="w-[18px] h-[18px] text-ink" strokeWidth={1.75} />
+        <div className="w-10 h-10 rounded-lg bg-card border border-border flex items-center justify-center">
+          <Icon className="w-[18px] h-[18px] text-foreground" strokeWidth={1.75} />
         </div>
-        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-canvas border border-line text-[9px] font-mono text-faint flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-elevated border border-border text-[9px] font-mono text-muted-foreground flex items-center justify-center">
           {step}
         </span>
       </div>
       <div className="min-w-0 pt-0.5">
-        <p className="text-sm font-semibold text-ink">{label}</p>
-        <p className="text-sm text-mute mt-0.5 leading-snug">{desc}</p>
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <p className="text-sm text-muted-foreground mt-0.5 leading-snug">{desc}</p>
       </div>
     </div>
   )
@@ -93,38 +114,33 @@ function FlowStep({ label, desc, icon: Icon, step }: { label: string; desc: stri
 
 function TaskViewMock() {
   return (
-    <BentoCard className="shadow-soft">
-      <BentoHeader action={<span className="text-xs font-mono text-faint tabular-nums">2:14</span>}>
-        <div className="flex items-center gap-2 min-w-0">
+    <BentoCard className="h-full">
+      <BentoHeader action={<span className="text-xs font-mono text-muted-foreground tabular-nums">2:14</span>}>
+        <div className="flex items-center gap-2.5 min-w-0">
           <Badge tone="primary" dot>Running</Badge>
-          <span className="text-sm text-mute truncate">#11 — Activity timeline</span>
+          <span className="text-sm font-medium text-foreground truncate">#11 — Activity timeline</span>
         </div>
       </BentoHeader>
-      <div className="grid sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-line">
-        <div className="sm:col-span-2 p-4 space-y-2 bg-canvas/30">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-faint mb-2">Plan</p>
+      <div className="grid sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-border">
+        <div className="sm:col-span-2 p-4 space-y-2 bg-card">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Plan</p>
           {['Implement changes', 'Verify build', 'Commit'].map((s, i) => (
             <div
               key={s}
               className={cn(
                 'text-xs px-2.5 py-2 rounded-md border',
                 i === 0
-                  ? 'bg-primary-soft border-primary/20 text-primary-dark font-medium'
-                  : 'border-line text-mute',
+                  ? 'bg-primary/10 border-primary/25 text-primary font-medium'
+                  : 'border-border text-muted-foreground bg-background',
               )}
             >
               {i === 0 ? '✓ ' : ''}{s}
             </div>
           ))}
         </div>
-        <div className="sm:col-span-3 p-4 bg-[#0D1117] font-mono text-[11px] space-y-1.5 leading-relaxed">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-2">Terminal</p>
-          {LOG_LINES.slice(0, 5).map((line, i) => (
-            <div key={i} className="flex gap-2">
-              <span className={cn('shrink-0', line.t === 'ok' ? 'text-[#3FB950]' : 'text-white/25')}>›</span>
-              <span className={line.t === 'ok' ? 'text-[#3FB950]' : 'text-white/60'}>{line.text}</span>
-            </div>
-          ))}
+        <div className="sm:col-span-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-4 pt-4 pb-2">Terminal</p>
+          <LogMock lines={LOG_LINES} limit={5} />
         </div>
       </div>
     </BentoCard>
@@ -133,38 +149,31 @@ function TaskViewMock() {
 
 function LiveRunCard() {
   return (
-    <BentoCard className="h-full">
-      <BentoHeader action={<span className="text-[10px] font-mono text-faint">issue #11</span>}>
+    <BentoCard className="h-full flex flex-col">
+      <BentoHeader action={<span className="text-[10px] font-mono text-muted-foreground">issue #11</span>}>
         <div className="flex items-center gap-2">
-          <Terminal className="w-3.5 h-3.5 text-mute" />
-          <span className="text-sm font-medium text-ink">Live run</span>
+          <Terminal className="w-3.5 h-3.5 text-primary" />
+          <span className="text-sm font-medium text-foreground">Live run</span>
         </div>
       </BentoHeader>
-      <div className="p-4 bg-[#0D1117] font-mono text-[11px] leading-relaxed space-y-1.5 flex-1">
-        {LOG_LINES.map((line, i) => (
-          <div key={i} className="flex items-start gap-2">
-            <span className={cn('shrink-0', line.t === 'ok' ? 'text-[#3FB950]' : 'text-white/25')}>›</span>
-            <span className={line.t === 'ok' ? 'text-[#3FB950]' : 'text-white/60'}>{line.text}</span>
-          </div>
-        ))}
-      </div>
+      <LogMock lines={LOG_LINES} />
     </BentoCard>
   )
 }
 
 function BenefitsCard() {
   return (
-    <BentoCard className="h-full">
+    <BentoCard className="h-full flex flex-col">
       <BentoHeader>
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-faint">What you get</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">What you get</p>
       </BentoHeader>
-      <BentoContent className="space-y-3">
+      <BentoContent className="space-y-4 flex-1 flex flex-col justify-center">
         {BENEFITS.map(({ icon: Icon, text }) => (
           <div key={text} className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-md bg-canvas border border-line flex items-center justify-center shrink-0">
-              <Icon className="w-3.5 h-3.5 text-mute" strokeWidth={1.75} />
+            <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4 text-primary" strokeWidth={1.75} />
             </div>
-            <p className="text-sm text-ink leading-snug">{text}</p>
+            <p className="text-sm text-foreground leading-snug">{text}</p>
           </div>
         ))}
       </BentoContent>
@@ -174,16 +183,16 @@ function BenefitsCard() {
 
 function PillarCard({ n, title, desc, icon: Icon }: (typeof PILLARS)[number]) {
   return (
-    <BentoCard>
-      <BentoContent>
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="w-9 h-9 rounded-lg bg-canvas border border-line flex items-center justify-center">
-            <Icon className="w-4 h-4 text-ink" strokeWidth={1.75} />
+    <BentoCard className="h-full">
+      <BentoContent className="h-full flex flex-col">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <Icon className="w-4 h-4 text-primary" strokeWidth={1.75} />
           </div>
-          <span className="text-[10px] font-mono text-faint">{n}</span>
+          <span className="text-[10px] font-mono text-muted-foreground tabular-nums">{n}</span>
         </div>
-        <p className="text-sm font-semibold text-ink">{title}</p>
-        <p className="text-sm text-mute mt-1 leading-snug">{desc}</p>
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground mt-1.5 leading-snug flex-1">{desc}</p>
       </BentoContent>
     </BentoCard>
   )
@@ -191,26 +200,26 @@ function PillarCard({ n, title, desc, icon: Icon }: (typeof PILLARS)[number]) {
 
 function GitHubFlowStrip() {
   return (
-    <BentoCard interactive={false} className="shadow-soft">
-      <BentoHeader action={<span className="text-[10px] font-mono text-faint">issue #11</span>}>
+    <BentoCard interactive={false}>
+      <BentoHeader action={<span className="text-[10px] font-mono text-muted-foreground">issue #11</span>}>
         <div>
-          <p className="text-sm font-semibold text-ink">What you end up with</p>
-          <p className="text-xs text-mute mt-0.5">Same repo · your account · real branch &amp; PR</p>
+          <p className="text-sm font-semibold text-foreground">What you end up with</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Same repo · your account · real branch &amp; PR</p>
         </div>
       </BentoHeader>
 
-      <div className="grid lg:grid-cols-[1fr_auto_1fr]">
-        <div className="p-5 lg:p-6 border-b lg:border-b-0 lg:border-r border-line">
+      <div className="grid lg:grid-cols-[1fr_auto_1fr] lg:items-stretch">
+        <div className="p-5 lg:p-6 border-b lg:border-b-0 lg:border-r border-border flex flex-col">
           <div className="flex items-center gap-2 mb-3">
-            <CircleDot className="w-3.5 h-3.5 text-success" strokeWidth={2} />
+            <CircleDot className="w-3.5 h-3.5 text-success shrink-0" strokeWidth={2} />
             <span className="text-xs font-medium text-success">Open issue</span>
-            <span className="text-xs text-faint ml-auto font-mono">#11</span>
+            <span className="text-xs text-muted-foreground ml-auto font-mono">#11</span>
           </div>
-          <h3 className="text-base font-semibold text-ink leading-snug mb-1">
+          <h3 className="text-base font-semibold text-foreground leading-snug mb-1">
             Activity timeline + TaskView integration
           </h3>
-          <p className="text-sm text-mute mb-4">Ayushjo/MyOwnDevin</p>
-          <dl className="grid grid-cols-2 gap-3 text-xs">
+          <p className="text-sm text-muted-foreground mb-5">Ayushjo/MyOwnDevin</p>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs mt-auto">
             {[
               ['Label', 'enhancement'],
               ['Steps', '3 planned'],
@@ -218,52 +227,52 @@ function GitHubFlowStrip() {
               ['Input', '…/issues/11'],
             ].map(([k, v]) => (
               <div key={k}>
-                <dt className="text-faint text-[10px] uppercase tracking-wide">{k}</dt>
-                <dd className="text-ink font-medium mt-0.5 truncate">{v}</dd>
+                <dt className="text-muted-foreground text-[10px] uppercase tracking-wide">{k}</dt>
+                <dd className="text-foreground font-medium mt-0.5 truncate">{v}</dd>
               </div>
             ))}
           </dl>
         </div>
 
-        <div className="hidden lg:flex flex-col items-center justify-center px-4 bg-canvas/40 border-r border-line">
-          <div className="w-9 h-9 rounded-full border border-line bg-paper flex items-center justify-center">
-            <ArrowRight className="w-3.5 h-3.5 text-mute" />
+        <div className="hidden lg:flex flex-col items-center justify-center px-5 bg-muted self-stretch">
+          <div className="w-10 h-10 rounded-full border border-border bg-card flex items-center justify-center">
+            <ArrowRight className="w-4 h-4 text-primary" />
           </div>
         </div>
 
-        <div className="p-5 lg:p-6 bg-primary-soft/20">
+        <div className="p-5 lg:p-6 bg-primary/5 flex flex-col">
           <div className="flex items-center gap-2 mb-3">
-            <GitPullRequest className="w-3.5 h-3.5 text-primary-dark" strokeWidth={2} />
-            <span className="text-xs font-medium text-primary-dark">Pull request</span>
-            <span className="text-xs text-faint ml-auto font-mono">open</span>
+            <GitPullRequest className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={2} />
+            <span className="text-xs font-medium text-primary">Pull request</span>
+            <span className="text-xs text-muted-foreground ml-auto font-mono">open</span>
           </div>
-          <h3 className="text-base font-semibold text-ink leading-snug mb-1">
+          <h3 className="text-base font-semibold text-foreground leading-snug mb-1">
             fix: Activity timeline integration
           </h3>
-          <p className="text-xs font-mono text-mute mb-4">
-            <span className="text-primary-dark">pullwright/task-b0efb2ec</span>
-            <span className="text-faint"> → </span>main
+          <p className="text-xs font-mono text-muted-foreground mb-5">
+            <span className="text-primary">pullwright/task-b0efb2ec</span>
+            <span className="text-muted-foreground"> → </span>main
           </p>
-          <dl className="grid grid-cols-2 gap-3 text-xs">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs mt-auto">
             <div>
-              <dt className="text-faint text-[10px] uppercase tracking-wide">Files</dt>
-              <dd className="text-ink font-medium mt-0.5">
+              <dt className="text-muted-foreground text-[10px] uppercase tracking-wide">Files</dt>
+              <dd className="text-foreground font-medium mt-0.5">
                 <span className="text-success">+12</span>
-                <span className="text-faint mx-0.5">/</span>
+                <span className="text-muted-foreground mx-0.5">/</span>
                 <span className="text-danger">−2</span>
               </dd>
             </div>
             <div>
-              <dt className="text-faint text-[10px] uppercase tracking-wide">Cost</dt>
-              <dd className="text-ink font-medium mt-0.5">$0.013</dd>
+              <dt className="text-muted-foreground text-[10px] uppercase tracking-wide">Cost</dt>
+              <dd className="text-foreground font-medium mt-0.5">$0.013</dd>
             </div>
             <div>
-              <dt className="text-faint text-[10px] uppercase tracking-wide">Steps</dt>
-              <dd className="text-ink font-medium mt-0.5">3 / 3</dd>
+              <dt className="text-muted-foreground text-[10px] uppercase tracking-wide">Steps</dt>
+              <dd className="text-foreground font-medium mt-0.5">3 / 3</dd>
             </div>
             <div>
-              <dt className="text-faint text-[10px] uppercase tracking-wide">Closes</dt>
-              <dd className="text-ink font-medium mt-0.5">#11</dd>
+              <dt className="text-muted-foreground text-[10px] uppercase tracking-wide">Closes</dt>
+              <dd className="text-foreground font-medium mt-0.5">#11</dd>
             </div>
           </dl>
         </div>
@@ -276,9 +285,8 @@ function DemoVideo() {
   const [hasVideo] = useState(false)
 
   return (
-    <BentoCard interactive={false} className="overflow-hidden shadow-soft">
+    <BentoCard interactive={false} className="overflow-hidden">
       <div className="aspect-video bg-[#0D1117] relative">
-        <div className="absolute inset-0 opacity-20 bg-grid bg-[length:24px_24px]" />
         {hasVideo ? (
           <video className="w-full h-full object-cover" controls playsInline poster="/demo-poster.png">
             <source src="/demo.mp4" type="video/mp4" />
@@ -337,12 +345,12 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-canvas text-ink antialiased">
+    <div className="min-h-screen bg-background text-foreground antialiased pb-20 md:pb-0">
       <TopNav />
 
       {/* Hero */}
-      <section className="border-b border-line bg-paper/40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16">
+      <section className="border-b border-border bg-card">
+        <div className="max-w-6xl mx-auto px-gutter sm:px-gutter py-12 lg:py-20">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
             <motion.div variants={stagger(0.05)} initial="hidden" animate="show">
               <motion.div variants={fadeUp} className="mb-5">
@@ -350,12 +358,12 @@ export default function Home() {
               </motion.div>
               <motion.h1
                 variants={fadeUp}
-                className="text-4xl sm:text-[2.75rem] font-bold tracking-tight leading-[1.1] text-ink"
+                className="text-4xl sm:text-5xl lg:text-[66px] font-bold tracking-tight leading-[1.08] text-foreground"
               >
                 Issue → pull request.
-                <span className="block text-mute font-semibold mt-1">Automatically.</span>
+                <span className="block text-muted-foreground font-semibold mt-2">Automatically.</span>
               </motion.h1>
-              <motion.p variants={fadeUp} className="text-mute text-base sm:text-lg mt-4 mb-7 max-w-md leading-relaxed">
+              <motion.p variants={fadeUp} className="text-muted-foreground text-base sm:text-lg mt-5 mb-8 max-w-md" style={{ lineHeight: 'var(--leading-body)' }}>
                 Paste a GitHub issue URL. Get a PR with live logs.
               </motion.p>
               <motion.form variants={fadeUp} onSubmit={handleSubmit} className="max-w-md">
@@ -375,8 +383,8 @@ export default function Home() {
                   </Button>
                 </div>
                 {!user && (
-                  <p className="text-faint text-xs mt-2">
-                    <button type="button" onClick={() => login('/tasks/new')} className="text-accent hover:underline">
+                  <p className="text-muted-foreground text-xs mt-2">
+                    <button type="button" onClick={() => login('/tasks/new')} className="text-primary hover:underline">
                       GitHub sign-in
                     </button>
                     {' '}required.
@@ -398,7 +406,7 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16">
+      <section className="max-w-6xl mx-auto px-gutter sm:px-gutter py-12 lg:py-16">
         <SectionHeader
           eyebrow="How it works"
           title="Issue in, PR out"
@@ -406,7 +414,7 @@ export default function Home() {
           className="mb-8"
         />
         <BentoCard interactive={false}>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-line">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
             {FLOW.map((step, i) => (
               <div key={step.label} className="p-5">
                 <FlowStep {...step} step={i + 1} />
@@ -417,7 +425,7 @@ export default function Home() {
       </section>
 
       {/* Product */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 lg:pb-16">
+      <section className="max-w-6xl mx-auto px-gutter sm:px-gutter pb-12 lg:pb-16">
         <SectionHeader
           eyebrow="Product"
           title="Built for real repos"
@@ -426,27 +434,29 @@ export default function Home() {
         />
 
         {/* Row 1: live run + benefits */}
-        <div className="grid lg:grid-cols-3 gap-4 mb-4">
-          <div className="lg:col-span-2">
-            <LiveRunCard />
+        <div className="grid lg:grid-cols-3 gap-4 mb-4 items-stretch">
+          <div className="lg:col-span-2 flex min-w-0">
+            <div className="w-full">
+              <LiveRunCard />
+            </div>
           </div>
           <BenefitsCard />
         </div>
 
         {/* Row 2: pillars */}
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-3 gap-4 items-stretch">
           {PILLARS.map((p) => (
             <PillarCard key={p.n} {...p} />
           ))}
         </div>
       </section>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+      <div className="max-w-6xl mx-auto px-gutter sm:px-gutter">
         <Separator />
       </div>
 
       {/* Demo + outcome */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-5">
+      <section className="max-w-6xl mx-auto px-gutter sm:px-gutter py-12 lg:py-16 space-y-5">
         <SectionHeader
           eyebrow="Demo"
           title="See it work"
@@ -458,10 +468,10 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-line py-7">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
+      <footer className="border-t border-border py-7">
+        <div className="max-w-6xl mx-auto px-gutter sm:px-gutter flex items-center justify-between gap-4">
           <Logo height={36} linked={false} animated={false} />
-          <div className="flex items-center gap-5 text-xs text-faint">
+          <div className="flex items-center gap-5 text-xs text-muted-foreground">
             <span>GitHub Issues</span>
             <span>OAuth</span>
             <span>Pull Requests</span>
@@ -470,6 +480,7 @@ export default function Home() {
           </div>
         </div>
       </footer>
+      <MobileBottomNav />
     </div>
   )
 }

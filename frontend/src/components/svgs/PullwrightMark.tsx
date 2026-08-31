@@ -72,9 +72,9 @@ export function PullwrightIcon({
     >
       <defs>
         <linearGradient id={gradId} x1="4" y1="8" x2="52" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#2EC4B6" />
-          <stop offset="55%" stopColor="#1FAF7A" />
-          <stop offset="100%" stopColor="#169B63" />
+          <stop offset="0%" stopColor="#5BA3FF" />
+          <stop offset="55%" stopColor="#2B7FFF" />
+          <stop offset="100%" stopColor="#0165FF" />
         </linearGradient>
       </defs>
       <IconPaths gradId={gradId} animated={animated} />
@@ -86,7 +86,7 @@ export function PullwrightIcon({
 export function PullwrightLockup({
   height = 32,
   className = '',
-  textClassName = 'fill-ink',
+  textClassName = 'fill-foreground',
   animated = false,
 }: MarkProps & { height?: number }) {
   const gradId = useId()
@@ -104,9 +104,9 @@ export function PullwrightLockup({
     >
       <defs>
         <linearGradient id={gradId} x1="4" y1="8" x2="52" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#2EC4B6" />
-          <stop offset="55%" stopColor="#1FAF7A" />
-          <stop offset="100%" stopColor="#169B63" />
+          <stop offset="0%" stopColor="#5BA3FF" />
+          <stop offset="55%" stopColor="#2B7FFF" />
+          <stop offset="100%" stopColor="#0165FF" />
         </linearGradient>
       </defs>
 
@@ -119,7 +119,7 @@ export function PullwrightLockup({
           textClassName,
           animated && 'transition-transform duration-500 group-hover:translate-x-[2px]',
         )}
-        style={{ fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 700, fontSize: 34 }}
+        style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif', fontWeight: 700, fontSize: 34 }}
       >
         Pullwright
       </text>

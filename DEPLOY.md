@@ -55,7 +55,9 @@ What **does not**:
 
 - Clone repo → run tools in container → push PR
 
-**For full execution later:** add a [Fly.io](https://fly.io) machine or VPS with Docker, run only the worker there, keep API on Railway — or move the whole backend to Fly.
+**For full execution later:** add a free Oracle Cloud VM as a remote Docker host (Tailscale + `DOCKER_HOST`) — see **[DEPLOY-VPS-DOCKER.md](./DEPLOY-VPS-DOCKER.md)** for the full step-by-step guide ($0 extra beyond your Railway plan).
+
+Or move the whole backend to Fly — or move the whole backend to a VPS.
 
 ---
 

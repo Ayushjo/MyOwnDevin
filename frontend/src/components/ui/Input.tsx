@@ -14,24 +14,24 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   return (
     <div
       className={cn(
-        'relative flex items-center rounded-xl border bg-white transition-all duration-200',
+        'relative flex items-center rounded-sm border bg-card transition-colors duration-micro',
         invalid
-          ? 'border-danger/50 focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.10)]'
-          : 'border-line focus-within:border-primary focus-within:shadow-glow-primary',
+          ? 'border-danger focus-within:ring-2 focus-within:ring-danger/30'
+          : 'border-border focus-within:ring-2 focus-within:ring-[rgba(43,127,255,0.3)]',
       )}
     >
-      {icon && <span className="absolute left-3.5 text-faint pointer-events-none flex">{icon}</span>}
+      {icon && <span className="absolute left-3 text-muted-foreground pointer-events-none flex">{icon}</span>}
       <input
         ref={ref}
         className={cn(
-          'w-full bg-transparent text-sm text-ink placeholder-faint outline-none rounded-xl py-3',
-          icon ? 'pl-10' : 'pl-4',
-          trailing ? 'pr-10' : 'pr-4',
+          'w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none rounded-sm py-2',
+          icon ? 'pl-9' : 'pl-3',
+          trailing ? 'pr-9' : 'pr-3',
           className,
         )}
         {...props}
       />
-      {trailing && <span className="absolute right-3.5 flex">{trailing}</span>}
+      {trailing && <span className="absolute right-3 flex">{trailing}</span>}
     </div>
   )
 })

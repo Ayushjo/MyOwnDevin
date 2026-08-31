@@ -9,7 +9,7 @@ export default function RouteGuard({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-canvas text-primary">
+      <div className="min-h-screen flex items-center justify-center bg-background text-primary">
         <Spinner className="w-6 h-6" />
       </div>
     )
