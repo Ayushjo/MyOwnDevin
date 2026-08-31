@@ -1,7 +1,21 @@
 import { Redis, type RedisOptions } from "ioredis"
 
 export function getRedisUrl(): string {
-  return process.env.REDIS_URL ?? "redis://127.0.0.1:6379"
+  const url =
+    process.env.REDIS_URL?.trim() ||
+    process.env.REDIS_PRIVATE_URL?.trim() ||
+    process.env.REDIS_PUBLIC_URL?.trim()
+
+  if (!url) {
+    if (process.env.NODE_ENV !== "production") {
+      return "redis://127.0.0.1:6379"
+    }
+    throw new Error(
+      "REDIS_URL is not set. On Railway: open your Redis service → Connect → copy REDIS_PRIVATE_URL into the API service as REDIS_URL (or use ${{YourRedisService.REDIS_PRIVATE_URL}}).",
+    )
+  }
+
+  return url
 }
 
 /** Shared ioredis options — family=0 required for Railway private networking (IPv6). */
