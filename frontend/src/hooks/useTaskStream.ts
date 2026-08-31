@@ -129,6 +129,10 @@ export function useTaskStream(taskId: string) {
         const status = state.status as string | undefined
         if (status === 'running') setIsRunning(true)
         else if (status) applyTerminalFromRegistry(taskId, status, setIsRunning, setFailedReason)
+
+        if (typeof state.failureReason === 'string' && state.failureReason) {
+          setFailedReason(state.failureReason)
+        }
       }
 
       for (const ev of stored) ingestEvent(ev)

@@ -7,10 +7,33 @@ import StepList from '../components/StepList'
 import LiveLog from '../components/LiveLog'
 import MetricsPanel from '../components/MetricsPanel'
 import { useTaskStream } from '../hooks/useTaskStream'
-import { getTask, updateTask } from '../store/taskStore'
-import { retryTask } from '../api/client'
+import { getTask, updateTask, addTask, type StoredTask } from '../store/taskStore'
+import { getTaskState, retryTask } from '../api/client'
 import { Badge, Button, useToast } from '../components/ui'
+import type { TaskStatus } from '../types/task'
 import { cn } from '../lib/cn'
+
+function mapApiStatus(status: unknown): TaskStatus {
+  if (status === 'done' || status === 'failed' || status === 'queued') return status
+  if (status === 'planning' || status === 'verifying' || status === 'running') return 'running'
+  return 'queued'
+}
+
+function taskFromApiState(taskId: string, state: Record<string, unknown>): StoredTask {
+  const issueUrl = String(state.issueUrl ?? '')
+  return {
+    id: taskId,
+    issueUrl,
+    issueTitle: String(state.issueTitle ?? `Task ${taskId.slice(0, 8)}`),
+    issueNumber: Number(state.issueNumber ?? 0),
+    repoName: String(state.repoName ?? issueUrl.replace('https://github.com/', '').split('/').slice(0, 2).join('/')),
+    branchName: String(state.branchName ?? `pullwright/task-${taskId}`),
+    status: mapApiStatus(state.status),
+    steps: [],
+    createdAt: String(state.createdAt ?? new Date().toISOString()),
+    ...(state.prUrl ? { prUrl: String(state.prUrl) } : {}),
+  }
+}
 
 function useElapsedTimer(running: boolean) {
   const [elapsed, setElapsed] = useState(0)
@@ -73,14 +96,42 @@ export default function TaskView() {
   const taskId = id ?? ''
   const { push: pushToast } = useToast()
 
-  const [task, setTask] = useState(() => getTask(taskId))
+  const [task, setTask] = useState<StoredTask | null>(() => getTask(taskId) ?? null)
+  const [taskLoading, setTaskLoading] = useState(() => !getTask(taskId))
   const { events, steps, isRunning, metrics, failedReason, reconnect } = useTaskStream(taskId)
   const elapsed = useElapsedTimer(isRunning)
   const [retrying, setRetrying] = useState(false)
   const [highlightedStepId, setHighlightedStepId] = useState<number | null>(null)
   const stepGroupRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 
-  useEffect(() => { setTask(getTask(taskId)) }, [taskId, isRunning])
+  useEffect(() => { setTask(getTask(taskId) ?? null) }, [taskId, isRunning])
+
+  useEffect(() => {
+    if (!taskId) return
+    const local = getTask(taskId)
+    if (local) {
+      setTask(local)
+      setTaskLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setTaskLoading(true)
+    void getTaskState(taskId).then((state) => {
+      if (cancelled) return
+      if (!state) {
+        setTask(null)
+        setTaskLoading(false)
+        return
+      }
+      const built = taskFromApiState(taskId, state)
+      addTask(built)
+      setTask(built)
+      setTaskLoading(false)
+    })
+
+    return () => { cancelled = true }
+  }, [taskId])
 
   useEffect(() => {
     if (steps.length > 0) {
@@ -122,6 +173,16 @@ export default function TaskView() {
     const motionPref = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     el.scrollIntoView({ behavior: motionPref ? 'auto' : 'smooth', block: 'start' })
   }, [])
+
+  if (taskLoading) {
+    return (
+      <AppShell maxWidth="max-w-6xl">
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <p className="text-muted-foreground">Loading task…</p>
+        </div>
+      </AppShell>
+    )
+  }
 
   if (!task) {
     return (

@@ -9,7 +9,7 @@ import type { EventLog } from "../events/eventLog.js";
 import { requireAuth } from "./auth.js";
 import { getBudgetGuard } from "../llm/budgetGuard.js";
 import { isDatabaseEnabled } from "../db/prisma.js";
-import { createTaskInDb, getStatsForUser, listTasksForUser, userOwnsTask, getMetricsFromDb } from "../repositories/taskRepository.js";
+import { createTaskInDb, getStatsForUser, listTasksForUser, userOwnsTask, getMetricsFromDb, getTaskDetailFromDb, getTaskFromDb } from "../repositories/taskRepository.js";
 
 function parseIssueNumber(issueUrl: string): number {
   const m = issueUrl.match(/\/issues\/(\d+)/)
@@ -136,14 +136,16 @@ export const createRouter = (
     try {
       const registry = await taskRegistry.get(taskId)
       const state = await checkpointStore.load(taskId)
-      if (!state && !registry) {
-        return res.status(404).json({ error: "Task not found" })
-      }
       if (state && registry) {
         return res.status(200).json({ ...state, status: registry.status, prUrl: registry.prUrl })
       }
       if (state) return res.status(200).json(state)
-      return res.status(200).json(registry)
+      if (registry) return res.status(200).json(registry)
+
+      const fromDb = await getTaskDetailFromDb(taskId)
+      if (fromDb) return res.status(200).json(fromDb)
+
+      return res.status(404).json({ error: "Task not found" })
     } catch (error) {
       logger.error("Error fetching task state: " + error)
       res.status(500).json({ error: "Internal server error" })
@@ -168,6 +170,7 @@ export const createRouter = (
     const bodyIssueUrl = typeof req.body?.issueUrl === "string" ? req.body.issueUrl : undefined
     const checkpoint = await checkpointStore.load(taskId)
     let registry = await taskRegistry.get(taskId)
+    const fromDb = !checkpoint && !registry ? await getTaskFromDb(taskId) : null
     if (!checkpoint && !registry && bodyIssueUrl) {
       await taskRegistry.registerOrUpdate(taskId, {
         issueUrl: bodyIssueUrl,
@@ -176,10 +179,10 @@ export const createRouter = (
       })
       registry = await taskRegistry.get(taskId)
     }
-    if (!checkpoint && !registry) {
+    if (!checkpoint && !registry && !fromDb) {
       return res.status(404).json({ error: "Task not found" })
     }
-    const issueUrl = checkpoint?.issueUrl ?? registry?.issueUrl
+    const issueUrl = checkpoint?.issueUrl ?? registry?.issueUrl ?? fromDb?.issueUrl
     if (!issueUrl) return res.status(400).json({ error: "No issue URL" })
 
     const githubToken = req.session?.accessToken

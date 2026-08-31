@@ -5,7 +5,7 @@ import { Plus, TrendingUp, Zap, CheckCircle, XCircle } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { Tabs, Skeleton, type TabItem } from '../components/ui'
 import TaskCard from '../components/TaskCard'
-import { getTasks, type StoredTask } from '../store/taskStore'
+import { getTasks, addTask, type StoredTask } from '../store/taskStore'
 import { listTasks, getStats, type StatsResponse } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import type { TaskStatus, TaskRegistryEntry } from '../types/task'
@@ -152,7 +152,11 @@ export default function Dashboard() {
       ])
       if (statsRes.status === 'fulfilled' && statsRes.value) setStats(statsRes.value)
       if (tasksRes.status === 'fulfilled' && tasksRes.value?.length) {
-        setAllTasks(mergeTasks(local, tasksRes.value))
+        const merged = mergeTasks(local, tasksRes.value)
+        for (const t of merged) {
+          if (!local.find((l) => l.id === t.id)) addTask(t)
+        }
+        setAllTasks(merged)
       } else {
         setAllTasks(local)
       }

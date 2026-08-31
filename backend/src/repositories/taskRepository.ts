@@ -260,6 +260,57 @@ export async function syncStepsToDb(taskId: string, steps: Step[]): Promise<void
   }
 }
 
+export async function getTaskDetailFromDb(taskId: string): Promise<{
+  issueUrl: string
+  issueTitle: string
+  issueNumber: number
+  status: TaskRegistryEntry["status"]
+  prUrl?: string
+  failureReason?: string
+  branchName: string
+  repoName: string
+  createdAt: string
+  steps: Step[]
+  completedStepIds: number[]
+} | null> {
+  if (!isDatabaseEnabled()) return null
+
+  const row = await getPrisma().task.findUnique({
+    where: { id: taskId },
+    include: { steps: { orderBy: { stepNumber: "asc" } } },
+  })
+  if (!row) return null
+
+  const completedStepIds: number[] = []
+  const steps: Step[] = row.steps.map((s) => {
+    if (s.status === "done") completedStepIds.push(s.stepNumber)
+    const step: Step = {
+      id: s.stepNumber,
+      title: s.title ?? `Step ${s.stepNumber}`,
+      description: s.description,
+    }
+    return step
+  })
+
+  const repoName =
+    row.repoOwner && row.repoName ? `${row.repoOwner}/${row.repoName}` : row.issueUrl.replace("https://github.com/", "").split("/").slice(0, 2).join("/")
+
+  const entry = toRegistryEntry(row)
+  return {
+    issueUrl: row.issueUrl,
+    issueTitle: row.issueTitle,
+    issueNumber: row.issueNumber,
+    status: entry.status,
+    ...(row.prUrl ? { prUrl: row.prUrl } : {}),
+    ...(row.failureReason ? { failureReason: row.failureReason } : {}),
+    branchName: row.branchName ?? `pullwright/task-${taskId}`,
+    repoName,
+    createdAt: row.createdAt.toISOString(),
+    steps,
+    completedStepIds,
+  }
+}
+
 export async function isTaskTerminalInDb(taskId: string): Promise<boolean> {
   if (!isDatabaseEnabled()) return false
   const row = await getPrisma().task.findUnique({
