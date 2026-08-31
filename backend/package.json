@@ -6,7 +6,13 @@
   "scripts": {
     "start": "tsc -b && node dist/index.js",
     "dev": "nodemon --watch src --ext ts --exec \"npm run build && node --env-file=.env dist/index.js\"",
-    "build": "tsc -b && cp src/sandbox/Dockerfile dist/sandbox/Dockerfile",
+    "build": "prisma generate && tsc -b && cp src/sandbox/Dockerfile dist/sandbox/Dockerfile",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:backfill": "tsx --env-file=.env scripts/backfillRedisToPostgres.ts",
+    "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:llm": "vitest run src/llm",
@@ -23,6 +29,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
     "@google/genai": "^2.19.0",
+    "@prisma/client": "^6.19.3",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.10",
@@ -48,6 +55,7 @@
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/dockerode": "^4.0.1",
+    "prisma": "^6.19.3",
     "tsx": "^4.23.12",
     "vitest": "^3.2.7"
   }

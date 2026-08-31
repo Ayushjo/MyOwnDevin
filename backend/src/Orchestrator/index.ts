@@ -16,6 +16,15 @@ import { BudgetExceededError } from "../llm/errors.js"
 import { createEmptyContext, toPrompt, summarizeOutput } from "../context/taskContext.js"
 import logger from "../logger.js"
 import { rm } from "fs/promises"
+import {
+    persistPlanSteps,
+    persistStepDone,
+    persistStepStart,
+    persistTaskComplete,
+    persistTaskFailed,
+    persistTaskMetrics,
+    persistTaskStatus,
+} from "../services/taskPersistence.js"
 
 /** Recover the pre-agent baseline SHA for checkpoints saved before baselineSha existed. */
 async function recoverBaselineSha(taskPath: string): Promise<string | undefined> {
@@ -124,6 +133,7 @@ export class AgentOrchestrator {
                 logger.info("Starting fresh task", { taskId })
 
                 await this.eventBus.emit(taskId, { type: "phase_start", phase: "planning" })
+                await persistTaskStatus(taskId, "planning")
                 metrics.startPhase("planning")
 
                 // Fail fast if Docker isn't available — sandbox is required
@@ -157,6 +167,7 @@ export class AgentOrchestrator {
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                 })
+                await persistTaskStatus(taskId, "running", { issueTitle, issueNumber, branchName })
 
                 // Repo recon
                 metrics.startPhase("recon")
@@ -207,6 +218,7 @@ export class AgentOrchestrator {
                 const planner = new PlannerAgent(router, metrics, this.eventBus, taskId)
                 steps = await planner.plan(issue.body ?? issue.title, context.repoStructure)
                 context.planSummary = steps.map((s) => `${s.id}. ${s.description}`).join("\n")
+                await persistPlanSteps(taskId, steps)
 
                 metrics.endPhase("planning")
                 await this.eventBus.emit(taskId, { type: "phase_end", phase: "planning", metrics: { durationMs: 0 } })
@@ -218,6 +230,7 @@ export class AgentOrchestrator {
             } else {
                 logger.info("Resuming task from checkpoint", { taskId, completedStepIds })
                 await this.taskRegistry.update(taskId, { status: "running" })
+                await persistTaskStatus(taskId, "running")
                 if (priorMetrics) {
                     await this.eventBus.emit(taskId, { type: "metrics_update", metrics: priorMetrics })
                 }
@@ -258,6 +271,7 @@ export class AgentOrchestrator {
                 metrics.startPhase("executing")
                 await this.eventBus.emit(taskId, { type: "phase_start", phase: "executing" })
                 await this.eventBus.emit(taskId, { type: "step_start", step })
+                await persistStepStart(taskId, step)
                 logger.info(`Step ${step.id} started: ${step.description}`, { taskId })
 
                 // Skip execution when the repo already satisfies this step (common on retry).
@@ -282,6 +296,7 @@ export class AgentOrchestrator {
                         result: { success: true, output: alreadyDone.reason },
                         verification: { passed: true, reason: alreadyDone.reason, layer: "deterministic", signals: ["preflight_skip"] },
                     })
+                    await persistStepDone(taskId, step.id, alreadyDone.reason)
                     logger.info(`Step ${step.id} complete (preflight skip)`, { taskId })
                     continue
                 }
@@ -303,12 +318,14 @@ export class AgentOrchestrator {
                     logger.error(reason, { taskId })
                     const snapshot = metrics.snapshot()
                     await this.taskRegistry.saveMetrics(taskId, snapshot)
+                    await persistTaskMetrics(taskId, snapshot)
                     await this.checkpointStore.save(taskId, {
                         steps, completedStepIds, taskPath, issueUrl,
                         issueTitle, issueNumber, defaultBranch, context,
                         metrics: snapshot,
                     })
                     await this.taskRegistry.update(taskId, { status: "failed" })
+                    await persistTaskFailed(taskId, snapshot, reason)
                     await this.eventBus.emit(taskId, { type: "task_failed", reason, metrics: snapshot })
                     return
                 }
@@ -332,6 +349,7 @@ export class AgentOrchestrator {
                     result: stepResult,
                     verification,
                 })
+                await persistStepDone(taskId, step.id, summarizeOutput(stepResult.output))
                 await this.eventBus.emit(taskId, { type: "metrics_update", metrics: metrics.snapshot() })
                 logger.info(`Step ${step.id} complete`, { taskId })
             }
@@ -376,6 +394,7 @@ export class AgentOrchestrator {
             const snapshot = metrics.snapshot()
             await this.taskRegistry.saveMetrics(taskId, snapshot)
             await this.taskRegistry.update(taskId, { status: "done", prUrl: data.html_url })
+            await persistTaskComplete(taskId, snapshot, data.html_url)
             await this.eventBus.emit(taskId, { type: "task_complete", prUrl: data.html_url, metrics: snapshot })
             logger.info("Task complete", { taskId })
 
@@ -386,6 +405,7 @@ export class AgentOrchestrator {
             logger.error(`Task failed: ${reason}`, { taskId })
             const snapshot = metrics.snapshot()
             await this.taskRegistry.saveMetrics(taskId, snapshot).catch(() => {})
+            await persistTaskMetrics(taskId, snapshot)
             if (checkpoint) {
                 await this.checkpointStore.save(taskId, {
                     steps: checkpoint.steps,
@@ -405,6 +425,7 @@ export class AgentOrchestrator {
                 issueNumber,
                 status: "failed",
             }).catch(() => {})
+            await persistTaskFailed(taskId, snapshot, reason)
             await this.eventBus.emit(taskId, { type: "task_failed", reason, metrics: snapshot })
             // Don't rethrow — prevents BullMQ from crashing the worker process
         } finally {

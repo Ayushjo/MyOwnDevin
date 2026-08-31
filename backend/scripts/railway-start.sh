@@ -16,4 +16,9 @@ if [[ -z "${DOCKER_HOST:-}" ]]; then
   echo "WARNING: DOCKER_HOST is not set — sandbox tasks will fail until you point at the Oracle Docker host."
 fi
 
+if [[ -n "${DATABASE_URL:-}" ]]; then
+  echo "Running database migrations..."
+  npx prisma migrate deploy
+fi
+
 exec node dist/index.js

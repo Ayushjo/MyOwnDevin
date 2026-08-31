@@ -8,10 +8,17 @@ import type { TaskRegistry } from "../store/taskRegistry.js";
 import type { EventLog } from "../events/eventLog.js";
 import { requireAuth } from "./auth.js";
 import { getBudgetGuard } from "../llm/budgetGuard.js";
+import { isDatabaseEnabled } from "../db/prisma.js";
+import { createTaskInDb, getStatsForUser, listTasksForUser, userOwnsTask, getMetricsFromDb } from "../repositories/taskRepository.js";
 
 function parseIssueNumber(issueUrl: string): number {
   const m = issueUrl.match(/\/issues\/(\d+)/)
   return m ? parseInt(m[1]!, 10) : 0
+}
+
+async function assertTaskAccess(req: import("express").Request, taskId: string): Promise<boolean> {
+  if (!isDatabaseEnabled() || !req.session?.userId) return true
+  return userOwnsTask(req.session.userId, taskId)
 }
 
 export const createRouter = (
@@ -29,10 +36,13 @@ export const createRouter = (
       if (!issueUrl) {
         return res.status(400).json({ error: "Issue URL is required" })
       }
+
+      if (isDatabaseEnabled() && !req.session?.userId) {
+        return res.status(401).json({ error: "Sign in required to create tasks" })
+      }
+
       const taskId = uuidv4();
       const issueNumber = parseIssueNumber(issueUrl)
-      // Thread the signed-in user's GitHub token so branches/PRs are pushed
-      // under their identity (fixes the shared-token 403).
       const githubToken = req.session?.accessToken
       const githubLogin = req.session?.login
 
@@ -47,6 +57,18 @@ export const createRouter = (
         createdAt: now,
         updatedAt: now,
       })
+
+      if (req.session?.userId) {
+        await createTaskInDb({
+          taskId,
+          userId: req.session.userId,
+          issueUrl,
+          issueTitle: `Issue #${issueNumber}`,
+          issueNumber,
+          ...(githubLogin ? { githubLogin } : {}),
+        })
+      }
+
       await taskQueue.add("tasks", { taskId, issueUrl, githubToken, githubLogin })
       logger.info("Task created: " + taskId + (githubLogin ? ` (as ${githubLogin})` : ""))
       res.status(200).json({
@@ -65,12 +87,15 @@ export const createRouter = (
   router.get("/task/:taskId/stream", async (req, res) => {
     const { taskId } = req.params;
 
+    if (!(await assertTaskAccess(req, taskId))) {
+      return res.status(403).json({ error: "Forbidden" })
+    }
+
     res.setHeader("Content-Type", "text/event-stream")
     res.setHeader("Cache-Control", "no-cache")
     res.setHeader("Connection", "keep-alive")
     res.flushHeaders()
 
-    // Replay stored events first
     const stored = await eventLog.range(taskId, 0)
     for (const event of stored) {
       res.write(`data: ${JSON.stringify(event)}\n\n`)
@@ -96,12 +121,18 @@ export const createRouter = (
 
   router.get("/task/:taskId/events", async (req, res) => {
     const { taskId } = req.params
+    if (!(await assertTaskAccess(req, taskId))) {
+      return res.status(403).json({ error: "Forbidden" })
+    }
     const events = await eventLog.range(taskId, 0)
     res.status(200).json(events)
   })
 
   router.get("/task/:taskId", async (req, res) => {
     const { taskId } = req.params
+    if (!(await assertTaskAccess(req, taskId))) {
+      return res.status(403).json({ error: "Forbidden" })
+    }
     try {
       const registry = await taskRegistry.get(taskId)
       const state = await checkpointStore.load(taskId)
@@ -121,13 +152,19 @@ export const createRouter = (
 
   router.get("/task/:taskId/metrics", async (req, res) => {
     const { taskId } = req.params
-    const metrics = await taskRegistry.getMetrics(taskId)
+    if (!(await assertTaskAccess(req, taskId))) {
+      return res.status(403).json({ error: "Forbidden" })
+    }
+    const metrics = (await taskRegistry.getMetrics(taskId)) ?? (await getMetricsFromDb(taskId))
     if (!metrics) return res.status(404).json({ error: "Metrics not found" })
     res.status(200).json(metrics)
   })
 
   router.post("/task/:taskId/retry", async (req, res) => {
     const { taskId } = req.params
+    if (!(await assertTaskAccess(req, taskId))) {
+      return res.status(403).json({ error: "Forbidden" })
+    }
     const bodyIssueUrl = typeof req.body?.issueUrl === "string" ? req.body.issueUrl : undefined
     const checkpoint = await checkpointStore.load(taskId)
     let registry = await taskRegistry.get(taskId)
@@ -147,8 +184,6 @@ export const createRouter = (
 
     const githubToken = req.session?.accessToken
     const githubLogin = req.session?.login
-    // Clear the stale event log so the previous failure/metrics don't replay
-    // into the UI when the client reconnects to the stream.
     await eventLog.clear(taskId)
     eventBus.cleanup(taskId)
     eventBus.subscribe(taskId)
@@ -158,12 +193,20 @@ export const createRouter = (
     res.status(200).json({ taskId, status: "requeued" })
   })
 
-  router.get("/tasks", async (_req, res) => {
+  router.get("/tasks", async (req, res) => {
+    if (isDatabaseEnabled() && req.session?.userId) {
+      const tasks = await listTasksForUser(req.session.userId, 50)
+      return res.status(200).json(tasks)
+    }
     const tasks = await taskRegistry.list(50)
     res.status(200).json(tasks)
   })
 
-  router.get("/stats", async (_req, res) => {
+  router.get("/stats", async (req, res) => {
+    if (isDatabaseEnabled() && req.session?.userId) {
+      const stats = await getStatsForUser(req.session.userId)
+      return res.status(200).json(stats)
+    }
     const tasks = await taskRegistry.list(200)
     const stats = { total: tasks.length, running: 0, done: 0, failed: 0, queued: 0 }
     for (const t of tasks) {

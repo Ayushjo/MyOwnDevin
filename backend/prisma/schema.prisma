@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum TaskStatus {
+  queued
+  planning
+  running
+  verifying
+  done
+  failed
+}
+
+enum PlanTier {
+  free
+  pro
+  team
+}
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  canceled
+  unpaid
+}
+
+enum UsageType {
+  llm_cost
+  task_run
+  storage
+}
+
+enum OrgMemberRole {
+  owner
+  admin
+  member
+}
+
+model User {
+  id          String   @id @default(uuid()) @db.Uuid
+  githubId    BigInt   @unique @map("github_id")
+  login       String   @unique
+  name        String?
+  avatarUrl   String?  @map("avatar_url")
+  email       String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastLoginAt DateTime @default(now()) @map("last_login_at") @db.Timestamptz(6)
+
+  tasks         Task[]
+  subscription  Subscription?
+  usageRecords  UsageRecord[]
+  orgMemberships OrganizationMember[]
+
+  @@map("users")
+}
+
+model Task {
+  id            String     @id @default(uuid()) @db.Uuid
+  userId        String     @map("user_id") @db.Uuid
+  issueUrl      String     @map("issue_url")
+  issueTitle    String     @map("issue_title")
+  issueNumber   Int        @map("issue_number")
+  repoOwner     String?    @map("repo_owner")
+  repoName      String?    @map("repo_name")
+  branchName    String?    @map("branch_name")
+  status        TaskStatus @default(queued)
+  prUrl         String?    @map("pr_url")
+  failureReason String?    @map("failure_reason")
+  githubLogin   String?    @map("github_login")
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt   DateTime?  @map("completed_at") @db.Timestamptz(6)
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps    TaskStep[]
+  metrics  TaskMetrics?
+  events   TaskEvent[]
+  usageRecords UsageRecord[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, status])
+  @@index([status])
+  @@map("tasks")
+}
+
+model TaskStep {
+  id            BigInt    @id @default(autoincrement())
+  taskId        String    @map("task_id") @db.Uuid
+  stepNumber    Int       @map("step_number")
+  title         String?
+  description   String
+  status        String    @default("pending")
+  outputSummary String?   @map("output_summary")
+  startedAt     DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, stepNumber])
+  @@map("task_steps")
+}
+
+model TaskMetrics {
+  taskId            String   @id @map("task_id") @db.Uuid
+  durationMs        Int      @map("duration_ms")
+  inputTokens       Int      @map("input_tokens")
+  outputTokens      Int      @map("output_tokens")
+  costUsd           Decimal  @map("cost_usd") @db.Decimal(12, 6)
+  shadowCostUsd     Decimal  @map("shadow_cost_usd") @db.Decimal(12, 6)
+  llmCalls          Int      @map("llm_calls")
+  toolCalls         Int      @map("tool_calls")
+  retries           Int      @default(0)
+  routerRetries     Int?     @map("router_retries")
+  providerFailovers Int?     @map("provider_failovers")
+  phases            Json     @default("{}")
+  budgetUsedUsd     Decimal? @map("budget_used_usd") @db.Decimal(12, 6)
+  budgetLimitUsd    Decimal? @map("budget_limit_usd") @db.Decimal(12, 6)
+  recordedAt        DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_metrics")
+}
+
+model TaskEvent {
+  id        BigInt   @id @default(autoincrement())
+  taskId    String   @map("task_id") @db.Uuid
+  sequence  Int
+  eventType String   @map("event_type")
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, sequence])
+  @@index([taskId, createdAt])
+  @@map("task_events")
+}
+
+model Plan {
+  id               String   @id @default(uuid()) @db.Uuid
+  tier             PlanTier @unique
+  name             String
+  stripePriceId    String?  @map("stripe_price_id")
+  monthlyPriceUsd  Decimal  @default(0) @map("monthly_price_usd") @db.Decimal(10, 2)
+  includedTasks    Int      @default(0) @map("included_tasks")
+  includedSpendUsd Decimal  @default(0) @map("included_spend_usd") @db.Decimal(12, 6)
+  limits           Json     @default("{}")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid()) @db.Uuid
+  userId               String             @unique @map("user_id") @db.Uuid
+  planId               String             @map("plan_id") @db.Uuid
+  stripeCustomerId     String?            @map("stripe_customer_id")
+  stripeSubscriptionId String?            @map("stripe_subscription_id")
+  status               SubscriptionStatus @default(active)
+  currentPeriodStart   DateTime?          @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd     DateTime?          @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd    Boolean            @default(false) @map("cancel_at_period_end")
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model UsageRecord {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  taskId        String?   @map("task_id") @db.Uuid
+  usageType     UsageType @map("usage_type")
+  quantity      Decimal   @default(1) @db.Decimal(12, 6)
+  unitAmountUsd Decimal   @default(0) @map("unit_amount_usd") @db.Decimal(12, 6)
+  totalUsd      Decimal   @map("total_usd") @db.Decimal(12, 6)
+  periodStart   DateTime  @map("period_start") @db.Timestamptz(6)
+  periodEnd     DateTime  @map("period_end") @db.Timestamptz(6)
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("usage_ledger")
+}
+
+model PaymentEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  stripeEventId String   @unique @map("stripe_event_id")
+  eventType     String   @map("event_type")
+  payload       Json
+  processedAt   DateTime @default(now()) @map("processed_at") @db.Timestamptz(6)
+  error         String?
+
+  @@map("payment_events")
+}
+
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  members OrganizationMember[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id        String        @id @default(uuid()) @db.Uuid
+  orgId     String        @map("org_id") @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  role      OrgMemberRole @default(member)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@map("organization_members")
+}

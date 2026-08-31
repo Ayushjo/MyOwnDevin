@@ -102,6 +102,11 @@ BACKEND_URL=https://api.pullwright.iayush.com
 # Link to Redis service (private — no egress)
 REDIS_URL=${{Redis.REDIS_PRIVATE_URL}}
 
+# Neon Postgres (persistent users, tasks, events, billing stubs)
+# Create project at https://neon.tech — use pooled URL for DATABASE_URL, direct for DIRECT_URL
+DATABASE_URL=postgresql://...@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+DIRECT_URL=postgresql://...@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
+
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 SESSION_SECRET=          # openssl rand -hex 32
@@ -184,8 +189,9 @@ Copy Client ID + Secret into Railway `api` variables. Redeploy `api` if already 
 1. Open `https://pullwright.iayush.com`
 2. **Sign in with GitHub** → should land on dashboard (not a login loop)
 3. `GET https://api.pullwright.iayush.com/health` → `{"status":"ok"}`
-4. `GET https://api.pullwright.iayush.com/health/docker` → likely `503` on Railway (expected)
-5. Submit a test issue — UI + SSE should work; sandbox step may fail until you add a Docker host
+4. `GET https://api.pullwright.iayush.com/health/db` → `{"status":"ok","database":"connected"}` when Neon is configured
+5. `GET https://api.pullwright.iayush.com/health/docker` → likely `503` on Railway (expected)
+6. Submit a test issue — UI + SSE should work; sandbox step may fail until you add a Docker host
 
 ### Login loop fixes
 
@@ -213,6 +219,8 @@ If you prefer Vercel for `pullwright.iayush.com`:
 | Variable | Service | Required |
 |----------|---------|----------|
 | `REDIS_URL` | api | ✅ private URL on Railway |
+| `DATABASE_URL` | api | recommended — Neon pooled connection |
+| `DIRECT_URL` | api | recommended — Neon direct (migrations) |
 | `FRONTEND_URL` | api | ✅ |
 | `BACKEND_URL` | api | ✅ |
 | `VITE_API_URL` | web | ✅ |

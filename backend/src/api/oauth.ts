@@ -1,6 +1,8 @@
 import { Router } from "express"
 import logger from "../logger.js"
 import { SessionStore, SESSION_COOKIE } from "../auth/session.js"
+import { upsertUserByGithubId } from "../repositories/userRepository.js"
+import { isDatabaseEnabled } from "../db/prisma.js"
 
 const GITHUB_AUTHORIZE = "https://github.com/login/oauth/authorize"
 const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
@@ -86,9 +88,57 @@ export function createOAuthRouter(sessionStore: SessionStore) {
       const userRes = await fetch(GITHUB_USER_URL, {
         headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/vnd.github+json" },
       })
-      const user = (await userRes.json()) as { login: string; name?: string; avatar_url: string }
+      if (!userRes.ok) {
+        const body = await userRes.text()
+        logger.error(`GitHub /user failed (${userRes.status}): ${body}`)
+        return res.redirect(`${frontendUrl()}/login?error=oauth_failed`)
+      }
+
+      const user = (await userRes.json()) as {
+        id?: number
+        login: string
+        name?: string
+        avatar_url: string
+        email?: string
+      }
+
+      if (!user.login || !user.avatar_url) {
+        logger.error("GitHub /user response missing required fields: " + JSON.stringify(user))
+        return res.redirect(`${frontendUrl()}/login?error=oauth_failed`)
+      }
+
+      let userId: string | undefined
+      if (isDatabaseEnabled()) {
+        if (!user.id) {
+          logger.error("GitHub /user response missing id — cannot persist user")
+        } else {
+          try {
+            const persisted = await upsertUserByGithubId({
+              githubId: BigInt(user.id),
+              login: user.login,
+              ...(user.name ? { name: user.name } : {}),
+              avatarUrl: user.avatar_url,
+              ...(user.email ? { email: user.email } : {}),
+            })
+            if (persisted) {
+              userId = persisted
+              logger.info(`User persisted to Postgres: ${user.login} (${persisted})`)
+            } else {
+              logger.error(`User upsert returned null for ${user.login}`)
+            }
+          } catch (dbError) {
+            logger.error(
+              `Failed to persist user to Postgres: ${dbError instanceof Error ? dbError.message : dbError}`,
+              { login: user.login, githubId: user.id },
+            )
+          }
+        }
+      } else {
+        logger.warn("DATABASE_URL not set — user stored in Redis session only")
+      }
 
       const sessionId = await sessionStore.create({
+        ...(userId ? { userId } : {}),
         login: user.login,
         ...(user.name ? { name: user.name } : {}),
         avatarUrl: user.avatar_url,
@@ -108,8 +158,15 @@ export function createOAuthRouter(sessionStore: SessionStore) {
   // Current user (public fields only).
   router.get("/me", (req, res) => {
     if (!req.session) return res.status(200).json({ user: null })
-    const { login, name, avatarUrl } = req.session
-    res.status(200).json({ user: { login, name, avatarUrl } })
+    const { userId, login, name, avatarUrl } = req.session
+    res.status(200).json({
+      user: {
+        ...(userId ? { id: userId } : {}),
+        login,
+        name,
+        avatarUrl,
+      },
+    })
   })
 
   // Short-lived token so EventSource (which can't send headers) can authenticate.

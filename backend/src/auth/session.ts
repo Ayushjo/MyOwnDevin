@@ -3,6 +3,7 @@ import crypto from "crypto"
 import { createRedisClient } from "../config/redis.js"
 
 export type SessionData = {
+  userId?: string
   login: string
   name?: string
   avatarUrl: string
@@ -12,6 +13,7 @@ export type SessionData = {
 
 // Public view of a session (never leaks the access token to the client).
 export type SessionPublic = {
+  id?: string
   login: string
   name?: string
   avatarUrl: string

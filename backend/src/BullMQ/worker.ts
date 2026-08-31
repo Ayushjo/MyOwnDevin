@@ -4,6 +4,7 @@ import type { EventBus } from "../events/eventBus.js";
 import { CheckpointStore } from "../store/checkpointStore.js";
 import type { TaskRegistry } from "../store/taskRegistry.js";
 import { getRedisOptions } from "../config/redis.js";
+import { persistTaskFailed } from "../services/taskPersistence.js";
 
 export const redisConnection = getRedisOptions() as Record<string, unknown>
 
@@ -27,12 +28,17 @@ export const startWorker = (
         const taskId = job?.data?.taskId ?? "unknown"
         const reason = err?.message ?? "Job failed"
         console.error(`Job failed [taskId=${taskId}]:`, reason)
+        const emptyMetrics = {
+            inputTokens: 0, outputTokens: 0, costUsd: 0, shadowCostUsd: 0,
+            llmCalls: 0, toolCalls: 0, retries: 0, durationMs: 0, phases: {},
+        }
         await eventBus.emit(taskId, {
             type: "task_failed",
             reason,
-            metrics: { inputTokens: 0, outputTokens: 0, costUsd: 0, shadowCostUsd: 0, llmCalls: 0, toolCalls: 0, retries: 0, durationMs: 0, phases: {} },
+            metrics: emptyMetrics,
         }).catch(() => {})
         await taskRegistry.update(taskId, { status: "failed" }).catch(() => {})
+        await persistTaskFailed(taskId, emptyMetrics, reason).catch(() => {})
     })
 
     return worker

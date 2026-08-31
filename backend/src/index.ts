@@ -15,6 +15,7 @@ import { TaskRegistry } from './store/taskRegistry.js';
 import { SandboxManager } from './sandbox/index.js';
 import { verifyRedisConnection } from './config/redisHealth.js';
 import { createDockerClient, resolveDockerSocket } from './config/docker.js';
+import { disconnectPrisma, verifyDatabaseConnection } from './db/prisma.js';
 
 const app = express();
 
@@ -67,12 +68,24 @@ app.get("/health/docker", async (_req, res) => {
     })
   }
 });
+app.get("/health/db", async (_req, res) => {
+  const ok = await verifyDatabaseConnection()
+  if (!ok) {
+    return res.status(process.env.DATABASE_URL ? 503 : 200).json({
+      status: process.env.DATABASE_URL ? "unavailable" : "disabled",
+      database: process.env.DATABASE_URL ? "configured" : "not_configured",
+    })
+  }
+  res.json({ status: "ok", database: "connected" })
+});
 
 void verifyRedisConnection().then((ok) => {
   if (!ok) {
     logger.warn("Server starting without a working Redis connection — task queue will not function")
   }
 })
+
+void verifyDatabaseConnection()
 
 void createDockerClient().ping().then(() => {
   logger.info(`Docker connected (${resolveDockerSocket() ?? "default socket"})`)
@@ -90,6 +103,7 @@ const shutdown = async (signal: string) => {
     await worker.close();
     const sandbox = new SandboxManager();
     await sandbox.cleanupOrphans();
+    await disconnectPrisma();
     server.close(() => process.exit(0));
 };
 
